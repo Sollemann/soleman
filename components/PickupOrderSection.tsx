@@ -49,7 +49,7 @@ import {
   LogisticsPartner,
   CustomerUser
 } from '../types';
-import { buildNewOrderWhatsAppUrl } from '../services/whatsappHelper';
+import { buildNewOrderWhatsAppUrl, parseShareLocInput } from '../services/whatsappHelper';
 
 interface PairFormItem {
   id: string;
@@ -161,6 +161,35 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   const [areaType, setAreaType] = useState<'Kota' | 'Kabupaten'>('Kota');
   const [areaName, setAreaName] = useState<string>(initialArea || 'Kesambi');
   const [landmark, setLandmark] = useState('');
+  const [waShareLocLink, setWaShareLocLink] = useState('');
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [isLocatingGps, setIsLocatingGps] = useState(false);
+  const [gpsStatusMsg, setGpsStatusMsg] = useState('');
+
+  const handleDetectSherlockGps = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGpsStatusMsg('Browser tidak mendukung GPS otomatis. Silakan isi Patokan atau tempel link Share Loc WA.');
+      return;
+    }
+    setIsLocatingGps(true);
+    setGpsStatusMsg('Mengunci titik koordinat Sherlock GPS akurat Anda...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        const accuracy = Math.round(pos.coords.accuracy || 10);
+        setGpsCoords({ lat, lng, accuracy });
+        setWaShareLocLink(`https://www.google.com/maps?q=${lat},${lng}`);
+        setIsLocatingGps(false);
+        setGpsStatusMsg(`✓ Titik Sherlock Terkunci Akurat (${lat}, ${lng} • ±${accuracy}m) — Otomatis masuk Dashboard Kurir!`);
+      },
+      () => {
+        setIsLocatingGps(false);
+        setGpsStatusMsg('Izin GPS belum aktif. Tenang, Patokan & Share Loc di chat WA tetap otomatis masuk ke Dashboard Kurir!');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   // Metode Pembayaran: QRIS dan COD
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
@@ -325,6 +354,23 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       ? shoesList[0].shoeBrand 
       : `${shoesList[0].shoeBrand} (+${pairsCount - 1} pasang)`;
 
+    const cleanArea = areaName.trim() || (distanceZone === 'luar_cirebon' ? 'Luar Cirebon' : areaType === 'Kota' ? 'Kota Cirebon' : 'Kabupaten Cirebon');
+    const cleanLandmark = landmark.trim();
+    const parsedShareLoc = parseShareLocInput(waShareLocLink);
+    const finalLat = gpsCoords?.lat ?? parsedShareLoc.lat;
+    const finalLng = gpsCoords?.lng ?? parsedShareLoc.lng;
+    const finalAccuracy = gpsCoords?.accuracy ?? (finalLat ? 10 : undefined);
+
+    const finalMapsUrl = finalLat && finalLng
+      ? `https://www.google.com/maps?q=${finalLat},${finalLng}`
+      : parsedShareLoc.cleanUrl
+      ? parsedShareLoc.cleanUrl
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((cleanLandmark ? cleanLandmark + ', ' : '') + cleanArea + ', Cirebon')}`;
+
+    const finalFullAddress = cleanLandmark
+      ? `${cleanLandmark} (Kec. ${cleanArea})`
+      : `Kec. ${cleanArea} (Share Loc WA)`;
+
     const newOrder: Order = {
       id: `SLC-${Math.floor(1000 + Math.random() * 9000)}`,
       customerId: customerUser?.id,
@@ -347,15 +393,18 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       trackingNumber: trackingNumber.trim() || undefined,
       customerConfirmedMaterialPhoto: confirmMaterialPhoto,
       location: {
-        areaName: areaName.trim() || (distanceZone === 'luar_cirebon' ? 'Luar Cirebon' : areaType === 'Kota' ? 'Kota Cirebon' : 'Kabupaten Cirebon'),
+        areaName: cleanArea,
         areaType: distanceZone === 'luar_cirebon' ? 'Luar_Cirebon' : areaType,
         distanceZone,
         logisticsPartner,
         trackingNumber: trackingNumber.trim() || undefined,
         shareLocViaWhatsApp: true,
-        fullAddress: landmark.trim() ? `Patokan: ${landmark.trim()} (Share Loc WA)` : 'Share Loc via WhatsApp Kurir Soleman',
-        landmark: landmark.trim(),
-        mapsUrl: `https://maps.google.com/?q=-6.7248,108.5521`,
+        fullAddress: finalFullAddress,
+        landmark: cleanLandmark || `Titik Sherlock Area ${cleanArea}`,
+        lat: finalLat,
+        lng: finalLng,
+        accuracy: finalAccuracy,
+        mapsUrl: finalMapsUrl,
       },
       paymentMethod,
       paymentStatus: paymentMethod === 'cod' ? 'cod_pending' : 'menunggu_pembayaran',
@@ -363,7 +412,8 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       deliveryFee,
       totalAmount: grandTotal,
       status: 'menunggu_jemput',
-      isAcceptedByAdmin: false,
+      isAcceptedByAdmin: true,
+      acceptedAt: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) + ' WIB',
       createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
       estimatedFinishedAt: '1 - 3 Hari Kerja',
       technicianName: 'Master Teknisi Soleman',
@@ -372,9 +422,9 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       timeline: [
         {
           status: 'menunggu_jemput',
-          label: 'Order Booking Dibuat',
+          label: 'Sherlock & Patokan Tersinkron ke Dashboard Kurir',
           timestamp: 'Baru saja',
-          description: `Booking ${pairsCount} pasang sepatu (${logisticsPartner.toUpperCase()}). Kurir siap proses via WA.`
+          description: `Booking ${pairsCount} pasang sepatu. Patokan: "${cleanLandmark || 'Share Loc WA'}" (${cleanArea}) otomatis masuk ke Dashboard Kurir Soleman.`
         }
       ]
     };
@@ -1147,35 +1197,93 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                   )}
                 </div>
 
-                {/* HIGHLIGHT: LOKASI OTOMATIS LEWAT WA */}
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-950 to-slate-950 border border-emerald-500/30 space-y-2.5">
-                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
-                    <Share2 className="w-4 h-4 text-emerald-400" />
-                    <span>Lokasi Penjemputan Otomatis Lewat WhatsApp (Share Loc)</span>
+                {/* HIGHLIGHT: SHERLOCK & PATOKAN DI WA -> OTOMATIS KE DASHBOARD KURIR SECARA AKURAT */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/50 via-slate-950 to-slate-950 border border-emerald-500/40 space-y-3.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                      <Share2 className="w-4 h-4 text-emerald-400" />
+                      <span>Sherlock (Share Loc) & Patokan WA → Otomatis ke Dashboard Kurir</span>
+                    </div>
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                      Sinkron Akurat Real-Time
+                    </span>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    ✨ <strong>Tanpa perlu repot mengetik alamat panjang atau mencari titik koordinat GPS!</strong>
-                    <br />
-                    Setelah Anda menekan tombol booking, pesan otomatis akan terbuka di WhatsApp. Anda cukup mengirimkan <em>Share Location (Kirim Lokasi Terkini)</em> langsung di chat WhatsApp Kurir Soleman.
-                  </p>
-                  <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px] text-slate-300 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Kurir Soleman akan langsung menavigasi ke titik share loc Anda.</span>
-                  </div>
-                </div>
 
-                {/* Patokan Rumah / Catatan Ringkas (Opsional) */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
-                    Patokan Rumah / Ciri-Ciri (Opsional)
-                  </label>
-                  <input
-                    type="text"
-                    value={landmark}
-                    onChange={(e) => setLandmark(e.target.value)}
-                    placeholder="Contoh: Depan Indomaret Tuparev, pagar hitam (Boleh dikosongkan)"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
-                  />
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Isi <strong>Patokan Lokasi</strong> di bawah ini dan/atau kunci <strong>Titik Sherlock GPS</strong> Anda. Saat Anda memesan via WhatsApp, titik Sherlock & Patokan Anda langsung masuk secara otomatis dan akurat ke <strong>Dashboard Kurir Soleman</strong> untuk navigasi penjemputan!
+                  </p>
+
+                  {/* 1. Patokan Rumah / Ciri-Ciri Lokasi (Prioritas Utama untuk Kurir) */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-extrabold uppercase tracking-wider text-amber-300">
+                      🚩 Patokan Lokasi / Ciri-Ciri Rumah (Sinkron ke WA & Dashboard Kurir) *
+                    </label>
+                    <input
+                      type="text"
+                      value={landmark}
+                      onChange={(e) => setLandmark(e.target.value)}
+                      placeholder="Contoh: Depan Indomaret Tuparev, Gang Melati No. 4, pagar hitam cat putih"
+                      className="w-full bg-slate-900 border border-amber-500/40 focus:border-amber-400 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400 block">
+                      Patokan ini langsung tampil di surat jalan WA dan kartu navigasi Dashboard Kurir.
+                    </span>
+                  </div>
+
+                  {/* 2. Tombol Kunci Sherlock GPS Otomatis + Link Share Loc WA */}
+                  <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-white block">
+                          🛰️ Kunci Titik Koordinat Sherlock Akurat (Opsional 1-Klik)
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          Agar peta di Dashboard Kurir langsung mengarah tepat ke depan rumah Anda:
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDetectSherlockGps}
+                        disabled={isLocatingGps}
+                        className="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md flex items-center justify-center gap-1.5 shrink-0 cursor-pointer transition-all"
+                      >
+                        <Navigation className="w-3.5 h-3.5 fill-slate-950" />
+                        <span>{isLocatingGps ? 'Mengunci GPS...' : gpsCoords ? 'Perbarui Titik Sherlock' : 'Kunci Sherlock GPS Saya'}</span>
+                      </button>
+                    </div>
+
+                    {gpsStatusMsg && (
+                      <div className={`p-2 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 ${
+                        gpsCoords
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                      }`}>
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>{gpsStatusMsg}</span>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                        Atau Tempel Link Share Loc WhatsApp / Google Maps (Jika Sudah Ada):
+                      </label>
+                      <input
+                        type="text"
+                        value={waShareLocLink}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setWaShareLocLink(val);
+                          const parsed = parseShareLocInput(val);
+                          if (parsed.lat && parsed.lng) {
+                            setGpsCoords({ lat: parsed.lat, lng: parsed.lng, accuracy: 10 });
+                            setGpsStatusMsg(`✓ Koordinat dari Link Share Loc Terbaca (${parsed.lat}, ${parsed.lng})!`);
+                          }
+                        }}
+                        placeholder="Contoh: https://maps.google.com/?q=-6.715,108.552 (Boleh dikosongkan, bisa Share Loc di chat WA)"
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-400 rounded-xl px-3 py-2 text-[11px] text-white placeholder-slate-500 focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Sesi Jam Jemput */}

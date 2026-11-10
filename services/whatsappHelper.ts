@@ -60,11 +60,21 @@ ${serviceList}`;
       ? `🛵 *Logistik Pengantaran:* Mitra GrabExpress / Maxim Delivery & Kurir Soleman (Radius Kabupaten)`
       : `🛵 *Logistik Pengantaran:* Kurir Internal Soleman (Area Dekat / Kota Cirebon)`;
 
+  const patokanInfo = order.location.landmark
+    ? `\n🚩 *Patokan Lokasi (Landmark):* *${order.location.landmark}*`
+    : '';
+  const gpsInfo = order.location.lat && order.location.lng
+    ? `\n🛰️ *Titik Sherlock GPS Akurat:* ${order.location.lat.toFixed(6)}, ${order.location.lng.toFixed(6)} (±${order.location.accuracy || 10}m)`
+    : '';
+  const mapsLinkInfo = order.location.mapsUrl
+    ? `\n🗺️ *Link Sherlock Google Maps:* ${order.location.mapsUrl}`
+    : '';
+
   const locationText = order.pickupType === 'drop_off'
     ? `🏢 *Metode:* Drop-off Langsung ke Workshop Soleman (Jl. Sukalila Selatan Cirebon)`
     : `${logisticsLabel}
-📍 *Wilayah / Jarak:* ${order.location.areaName} (${order.distanceZone === 'luar_cirebon' ? 'Luar Cirebon' : order.location.areaType || 'Cirebon'})
-📍 *Titik Lokasi:* *Saya langsung kirim Share Location (Share Loc) di chat WhatsApp ini ya Kurir Soleman!* 🛵💨${order.location.fullAddress && !order.location.fullAddress.includes('Share Loc') ? `\n🏠 *Patokan Tambahan:* ${order.location.fullAddress}` : ''}
+📍 *Wilayah / Kecamatan:* *${order.location.areaName}* (${order.distanceZone === 'luar_cirebon' ? 'Luar Cirebon' : order.location.areaType || 'Cirebon'})${patokanInfo}${gpsInfo}${mapsLinkInfo}
+📍 *Sherlock WhatsApp:* *Titik Sherlock & Patokan sudah tersinkron otomatis ke Dashboard Kurir Soleman (+ saya siap kirim Share Location di chat WA ini!)* 🛵💨
 ⏰ *Jadwal Jemput:* Sesi ${order.preferredTimeSlot.toUpperCase()}`;
 
   const photoNote = (order.photos && order.photos.length > 0) || order.photoUrl
@@ -257,14 +267,61 @@ Harap segera meluncur dan konfirmasi jika sepatu sudah diambil. Semangat di jala
 }
 
 /**
- * Link navigasi Google Maps untuk Kurir
+ * Ekstrak koordinat lat/lng atau URL Google Maps dari teks/link Share Loc WhatsApp
  */
-export function buildGoogleMapsRouteUrl(lat?: number, lng?: number, addressQuery?: string): string {
+export function parseShareLocInput(input: string): { lat?: number; lng?: number; cleanUrl?: string } {
+  const trimmed = input.trim();
+  if (!trimmed) return {};
+
+  // Cari pola koordinat lat,lng seperti -6.715234, 108.552341
+  const coordRegex = /(-?\d{1,2}\.\d{3,10})\s*,\s*(-?\d{1,3}\.\d{3,10})/;
+  const match = trimmed.match(coordRegex);
+  if (match) {
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+      return {
+        lat,
+        lng,
+        cleanUrl: `https://www.google.com/maps?q=${lat},${lng}`
+      };
+    }
+  }
+
+  // Cari URL http/https di dalam teks WA
+  const urlMatch = trimmed.match(/https?:\/\/[^\s]+/i);
+  if (urlMatch) {
+    return { cleanUrl: urlMatch[0] };
+  }
+
+  return {};
+}
+
+/**
+ * Link navigasi Google Maps akurat untuk Kurir berdasarkan Sherlock GPS, Link WA, atau Patokan + Kecamatan
+ */
+export function buildGoogleMapsRouteUrl(
+  lat?: number,
+  lng?: number,
+  addressQuery?: string,
+  landmark?: string,
+  mapsUrl?: string
+): string {
   if (lat && lng) {
     return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
   }
-  if (addressQuery) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery + ', Cirebon')}`;
+  if (mapsUrl && (mapsUrl.includes('goo.gl') || mapsUrl.includes('maps.app') || (mapsUrl.includes('maps') && !mapsUrl.includes('-6.7248,108.5521')))) {
+    const parsed = parseShareLocInput(mapsUrl);
+    if (parsed.lat && parsed.lng) {
+      return `https://www.google.com/maps/dir/?api=1&destination=${parsed.lat},${parsed.lng}`;
+    }
+    return mapsUrl;
+  }
+  const cleanAddress = (addressQuery || '').replace(/\(Share Loc WA\)|Share Loc via WhatsApp Kurir Soleman|Patokan:\s*/gi, '').trim();
+  const cleanLandmark = (landmark || '').trim();
+  const combinedParts = [cleanLandmark, cleanAddress, 'Cirebon'].filter(Boolean);
+  if (combinedParts.length > 1) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(combinedParts.join(', '))}`;
   }
   return WORKSHOP_INFO.googleMapsUrl;
 }

@@ -99,6 +99,24 @@ export const App: React.FC = () => {
     }
   }, [orders]);
 
+  // Real-time cross-tab synchronization so customer Sherlock & Patokan immediately appear on Courier Dashboard
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          if (Array.isArray(updated)) {
+            setOrders(updated);
+          }
+        } catch (err) {
+          console.warn('Failed to sync orders across tabs', err);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   // Handle adding new order
   const handleOrderCreated = (newOrder: Order) => {
     const orderWithCustomer = customerUser && !newOrder.customerId
@@ -181,6 +199,41 @@ export const App: React.FC = () => {
       return {
         ...order,
         paymentStatus
+      };
+    }));
+  };
+
+  // Handle updating customer Sherlock & Patokan location on Courier Dashboard
+  const handleUpdateOrderLocation = (
+    orderId: string,
+    locUpdate: {
+      landmark?: string;
+      fullAddress?: string;
+      mapsUrl?: string;
+      lat?: number;
+      lng?: number;
+      accuracy?: number;
+    }
+  ) => {
+    const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+    setOrders(prev => prev.map(order => {
+      if (order.id !== orderId) return order;
+      const updatedLandmark = locUpdate.landmark !== undefined ? locUpdate.landmark : order.location.landmark;
+      const updatedFullAddress = locUpdate.fullAddress !== undefined ? locUpdate.fullAddress : order.location.fullAddress;
+      const locTimeline = {
+        status: order.status,
+        label: 'Titik Sherlock & Patokan WA Diperbarui',
+        timestamp: timeStr,
+        description: `Lokasi Sherlock WA & Patokan disinkronkan akurat: ${updatedLandmark || updatedFullAddress}.`
+      };
+      return {
+        ...order,
+        location: {
+          ...order.location,
+          ...locUpdate,
+          shareLocViaWhatsApp: true,
+        },
+        timeline: [locTimeline, ...order.timeline]
       };
     }));
   };
@@ -393,6 +446,7 @@ export const App: React.FC = () => {
             orders={orders}
             onUpdateOrderStatus={handleUpdateOrderStatus}
             onUpdatePaymentStatus={handleUpdatePaymentStatus}
+            onUpdateOrderLocation={handleUpdateOrderLocation}
             onLogout={handleCourierLogout}
           />
         </main>

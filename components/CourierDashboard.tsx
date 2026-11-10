@@ -26,10 +26,11 @@ import {
   PackageCheck
 } from 'lucide-react';
 import { Order, OrderStatus, CourierUser, PaymentStatus } from '../types';
-import { STATUS_LABELS, WORKSHOP_INFO } from '../data/solcreftData';
+import { STATUS_LABELS, WORKSHOP_INFO, getServiceTierDetail } from '../data/solcreftData';
 import { 
   buildGoogleMapsRouteUrl, 
-  buildStatusNotificationWhatsAppUrl 
+  buildStatusNotificationWhatsAppUrl,
+  parseShareLocInput
 } from '../services/whatsappHelper';
 import { SolemanLogo } from './SolemanLogo';
 
@@ -38,6 +39,17 @@ interface CourierDashboardProps {
   orders: Order[];
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus, customNote?: string) => void;
   onUpdatePaymentStatus: (orderId: string, paymentStatus: PaymentStatus) => void;
+  onUpdateOrderLocation?: (
+    orderId: string,
+    locUpdate: {
+      landmark?: string;
+      fullAddress?: string;
+      mapsUrl?: string;
+      lat?: number;
+      lng?: number;
+      accuracy?: number;
+    }
+  ) => void;
   onLogout: () => void;
 }
 
@@ -46,6 +58,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
   orders,
   onUpdateOrderStatus,
   onUpdatePaymentStatus,
+  onUpdateOrderLocation,
   onLogout
 }) => {
   const [filterTab, setFilterTab] = useState<'all' | 'need_pickup' | 'ready_deliver' | 'cod_pending' | 'completed'>('all');
@@ -55,6 +68,11 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
   const [activeModalOrder, setActiveModalOrder] = useState<Order | null>(null);
   const [modalTargetStatus, setModalTargetStatus] = useState<OrderStatus>('perjalanan_workshop');
   const [modalCustomNote, setModalCustomNote] = useState('');
+
+  // Quick WA Sherlock & Patokan Sync State per Order
+  const [syncingOrderId, setSyncingOrderId] = useState<string | null>(null);
+  const [waShareLocText, setWaShareLocText] = useState('');
+  const [waPatokanText, setWaPatokanText] = useState('');
 
   // Counters
   const countNeedPickup = orders.filter(o => o.status === 'menunggu_jemput').length;
@@ -236,10 +254,13 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
           const navigationUrl = buildGoogleMapsRouteUrl(
             order.location.lat,
             order.location.lng,
-            order.location.fullAddress
+            order.location.areaName || order.location.fullAddress,
+            order.location.landmark,
+            order.location.mapsUrl
           );
 
           const isCodPending = order.paymentMethod === 'cod' && order.paymentStatus !== 'cod_selesai';
+          const isSyncingThisOrder = syncingOrderId === order.id;
 
           return (
             <div
@@ -298,60 +319,162 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
               {/* Order Info Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                 
-                {/* Col 1: Lokasi & Navigasi (5 cols) */}
+                {/* Col 1: Lokasi Sherlock WA & Patokan Akurat (5 cols) */}
                 <div className="lg:col-span-5 space-y-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4" /> Titik Lokasi Antar-Jemput Cirebon
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4" /> Sherlock WA & Patokan Pelanggan
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                      order.location.lat && order.location.lng
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    }`}>
+                      {order.location.lat && order.location.lng ? '🛰️ GPS Sherlock Akurat' : '📍 Sherlock & Patokan WA Aktif'}
+                    </span>
+                  </div>
 
                   <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between text-xs font-bold text-white">
-                        <span>Kecamatan: {order.location.areaName}</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-amber-300">
-                          {order.location.areaType || 'Cirebon'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 mt-1 font-medium">
-                        {order.location.fullAddress}
+                    <div className="flex items-center justify-between text-xs font-bold text-white">
+                      <span>Kecamatan: {order.location.areaName}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-amber-300">
+                        {order.location.areaType || 'Cirebon'}
+                      </span>
+                    </div>
+
+                    {/* HIGHLIGHTED PATOKAN BOX FOR COURIER */}
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 block">
+                        🚩 Patokan Rumah / Ciri-Ciri Lokasi (Dari WA Pelanggan):
+                      </span>
+                      <p className="text-xs font-bold text-white leading-snug">
+                        {order.location.landmark || order.location.fullAddress}
                       </p>
-                      {order.location.landmark && (
-                        <p className="text-[11px] text-amber-400 mt-1">
-                          Patokan: <strong>{order.location.landmark}</strong>
+                      {order.location.fullAddress && order.location.landmark && order.location.fullAddress !== order.location.landmark && (
+                        <p className="text-[11px] text-slate-300">
+                          Detail Area: {order.location.fullAddress}
                         </p>
                       )}
                     </div>
 
-                    {order.location.lat && order.location.lng && (
-                      <div className="text-[10px] font-mono text-slate-400 flex items-center justify-between bg-slate-900/60 p-2 rounded-lg border border-slate-800">
-                        <span>GPS: {order.location.lat.toFixed(5)}, {order.location.lng.toFixed(5)}</span>
+                    {order.location.lat && order.location.lng ? (
+                      <div className="text-[10px] font-mono text-slate-300 flex items-center justify-between bg-emerald-950/30 p-2 rounded-lg border border-emerald-500/30">
+                        <span>🛰️ Koordinat: {order.location.lat.toFixed(6)}, {order.location.lng.toFixed(6)}</span>
                         <span className="text-emerald-400 font-bold">Akurasi ±{order.location.accuracy || 10}m</span>
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-slate-400 flex items-center justify-between bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                        <span>Rute diarahkan akurat ke Patokan & Kec. {order.location.areaName}</span>
+                        <span className="text-amber-300 font-bold">Siap Navigasi</span>
                       </div>
                     )}
 
-                    {/* Navigation Buttons */}
-                    <div className="pt-1 flex gap-2">
+                    {/* Navigation & WhatsApp Share Loc Buttons */}
+                    <div className="pt-1 flex flex-wrap gap-2">
                       <a
                         href={navigationUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 shadow-md transition-all"
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-extrabold bg-sky-500 hover:bg-sky-400 text-slate-950 shadow-md transition-all"
                       >
                         <Navigation className="w-4 h-4 fill-slate-950" />
-                        <span>Buka Rute Google Maps</span>
+                        <span>Navigasi ke Titik Sherlock</span>
                       </a>
 
                       <a
-                        href={`https://wa.me/${order.customerPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Halo Kak ${order.customerName}! Saya Kurir Soleman Cirebon, sedang perjalanan ke lokasi Kakak di ${order.location.fullAddress}. Sepatu siap dijemput/diantar ya Kak.`)}`}
+                        href={`https://wa.me/${order.customerPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Halo Kak ${order.customerName}! Saya Kurir Soleman Cirebon untuk Order #${order.id}. Patokan lokasi Kakak di "${order.location.landmark || order.location.fullAddress}" sudah masuk di Dashboard Kurir saya. Mohon kirim Share Location (Sherlock) terkini di chat ini jika sudah siap dijemput ya Kak!`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md transition-all"
-                        title="Chat Pelanggan di WhatsApp"
+                        title="Chat & Minta Share Loc Pelanggan di WhatsApp"
                       >
                         <MessageSquare className="w-4 h-4" />
-                        <span className="hidden sm:inline">Chat WA</span>
+                        <span>WA Pelanggan</span>
                       </a>
                     </div>
+
+                    {/* Instant WA Sherlock & Patokan Sync Tool for Courier */}
+                    {onUpdateOrderLocation && (
+                      <div className="pt-2 border-t border-slate-800/80">
+                        {!isSyncingThisOrder ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSyncingOrderId(order.id);
+                              setWaShareLocText(order.location.mapsUrl || '');
+                              setWaPatokanText(order.location.landmark || '');
+                            }}
+                            className="w-full py-1.5 px-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-semibold text-amber-300 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Tempel / Update Link Sherlock & Patokan dari Chat WA</span>
+                          </button>
+                        ) : (
+                          <div className="p-3 rounded-xl bg-slate-900 border border-amber-500/40 space-y-2.5 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-amber-300 text-[11px]">
+                                Sinkronkan Sherlock & Patokan Baru dari WA:
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setSyncingOrderId(null)}
+                                className="text-slate-400 hover:text-white text-xs"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-slate-400 mb-1">Update Patokan Lokasi:</label>
+                              <input
+                                type="text"
+                                value={waPatokanText}
+                                onChange={(e) => setWaPatokanText(e.target.value)}
+                                placeholder="Contoh: Rumah pagar hitam samping masjid"
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-slate-400 mb-1">Tempel Link Share Loc WA / Koordinat GPS:</label>
+                              <input
+                                type="text"
+                                value={waShareLocText}
+                                onChange={(e) => setWaShareLocText(e.target.value)}
+                                placeholder="Contoh: https://maps.google.com/?q=-6.715,108.552"
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono focus:outline-none focus:border-emerald-400"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const parsed = parseShareLocInput(waShareLocText);
+                                  const cleanPatokan = waPatokanText.trim() || order.location.landmark;
+                                  onUpdateOrderLocation(order.id, {
+                                    landmark: cleanPatokan,
+                                    fullAddress: cleanPatokan ? `${cleanPatokan} (Kec. ${order.location.areaName})` : order.location.fullAddress,
+                                    lat: parsed.lat ?? order.location.lat,
+                                    lng: parsed.lng ?? order.location.lng,
+                                    accuracy: parsed.lat ? 5 : order.location.accuracy,
+                                    mapsUrl: parsed.cleanUrl || waShareLocText.trim() || order.location.mapsUrl,
+                                  });
+                                  setSyncingOrderId(null);
+                                }}
+                                className="flex-1 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer"
+                              >
+                                Simpan & Akuratkan Rute
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSyncingOrderId(null)}
+                                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs"
+                              >
+                                Batal
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -368,13 +491,17 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                     </div>
                     <span className="text-[11px] text-slate-400 block">{order.shoeType}</span>
 
-                    <div className="pt-2 border-t border-slate-800 space-y-1">
-                      {order.selectedServices.map(s => (
-                        <div key={s.id} className="text-xs text-slate-300 flex items-center justify-between">
-                          <span className="truncate pr-1">• {s.name}</span>
-                          <span className="text-amber-400/90 font-mono text-[11px] shrink-0">{s.priceFormatted}</span>
-                        </div>
-                      ))}
+                    <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                      {order.selectedServices.map(s => {
+                        const orderSev = order.severity || (order.shoes && order.shoes[0]?.severity) || 'normal';
+                        const tier = getServiceTierDetail(s, orderSev);
+                        return (
+                          <div key={s.id} className="text-xs text-slate-300 flex items-center justify-between gap-2">
+                            <span className="truncate pr-1">• {s.name} <span className="text-[10px] text-amber-300">({tier.badge})</span></span>
+                            <span className="text-amber-400/90 font-mono text-[11px] shrink-0">{tier.priceFormatted}</span>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {order.customNotes && (

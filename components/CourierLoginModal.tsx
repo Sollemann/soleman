@@ -138,14 +138,10 @@ export const CourierLoginModal: React.FC<CourierLoginModalProps> = ({
             </div>
           </div>
 
-          {/* Helper hint for courier password */}
-          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-amber-400 font-semibold">
-              <KeyRound className="w-3.5 h-3.5" /> Sandi Kurir Resmi:
-            </span>
-            <span className="font-mono font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-              Herdazabuza
-            </span>
+          {/* Security notice without displaying password */}
+          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 flex items-center gap-2">
+            <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Gunakan kata sandi resmi Kurir Soleman. Hubungi Admin Workshop jika lupa akses.</span>
           </div>
 
           <button

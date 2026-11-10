@@ -61,7 +61,7 @@ export const StaffPortalModal: React.FC<StaffPortalModalProps> = ({
                 Login Kurir Soleman
               </span>
               <span className="text-[11px] text-slate-400">
-                Akses kurir penjemputan & navigasi (Sandi: Herdazabuza)
+                Akses kurir penjemputan, sinkronisasi Sherlock WA & navigasi rute
               </span>
             </div>
           </button>

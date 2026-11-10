@@ -159,7 +159,7 @@ export const StaffAccessModal: React.FC<StaffAccessModalProps> = ({
                 Antar-jemput sepatu wilayah Cirebon, navigasi maps pelanggan, dan konfirmasi COD/QRIS.
               </p>
               <span className="inline-block mt-2 text-[10px] text-sky-400 font-semibold bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
-                Sandi: Herdazabuza
+                Akses Kurir Resmi
               </span>
             </div>
           </div>
