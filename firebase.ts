@@ -43,8 +43,7 @@ export const analyticsPromise =
 // Initialize Firebase Auth
 export const auth = getAuth(app);
 
-// Inisialisasi Firebase Firestore dengan ID Database eksplisit:
-// getFirestore(app, 'ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528')
+// 1. Inisialisasi Database Eksplisit (ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528)
 let firestoreInstance: Firestore;
 try {
   firestoreInstance = initializeFirestore(
@@ -55,9 +54,19 @@ try {
 } catch {
   firestoreInstance = getFirestore(app, FIRESTORE_DATABASE_ID);
 }
-
 export const db: Firestore = firestoreInstance;
-export const dbProvisioned: Firestore | null = null;
+
+// 2. Inisialisasi Database Default (default) untuk kompatibilitas penuh antar-HP di Vercel
+let defaultFirestoreInstance: Firestore;
+try {
+  defaultFirestoreInstance = initializeFirestore(app, {
+    ignoreUndefinedProperties: true,
+  });
+} catch {
+  defaultFirestoreInstance = getFirestore(app);
+}
+export const dbDefault: Firestore = defaultFirestoreInstance;
+export const dbProvisioned: Firestore | null = defaultFirestoreInstance;
 
 export enum OperationType {
   CREATE = 'create',

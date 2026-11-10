@@ -139,6 +139,11 @@ export const App: React.FC = () => {
             }
           }
         });
+      } else {
+        const isKurirReq = params.get('portal') === 'kurir' || params.get('kurir') === '1' || window.location.hash === '#kurir';
+        if (isKurirReq && !courierAuthService.getCurrentUser() && !adminAuthService.getCurrentUser()) {
+          setIsCourierLoginModalOpen(true);
+        }
       }
     } catch (err) {
       console.warn('Failed to parse kurir_order URL param', err);
@@ -586,6 +591,18 @@ export const App: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setRetryTrigger((prev) => prev + 1);
+                  soundFx.playClick();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/40 font-bold text-xs transition-all cursor-pointer"
+                title="Sinkronkan ulang seluruh pesanan dari server cloud secara online"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Sinkronkan Online</span>
+              </button>
               <button
                 onClick={handleCourierLogout}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 font-bold text-xs transition-all cursor-pointer"

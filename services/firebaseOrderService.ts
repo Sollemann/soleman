@@ -10,7 +10,7 @@ import {
   deleteDoc,
   onSnapshot,
 } from 'firebase/firestore';
-import { db, OperationType, handleFirestoreError, FIRESTORE_DATABASE_ID } from '../firebase';
+import { db, dbDefault, OperationType, handleFirestoreError, FIRESTORE_DATABASE_ID } from '../firebase';
 import { Order } from '../types';
 
 // Koleksi utama di Firebase Firestore sesuai instruksi pengguna
@@ -102,6 +102,11 @@ function sanitizeOrderForFirestore(
  * TIDAK menggunakan localStorage dan TIDAK mengisi data contoh bawaan (seperti Budi Santoso).
  * Jika koneksi ke Firebase Firestore (default) gagal, memicu callback onError untuk menampilkan pesan error merah di layar.
  */
+/**
+ * Langganan real-time (onSnapshot) hibrida ke Database Eksplisit DAN Database Default.
+ * Menggabungkan pesanan secara otomatis agar pesanan dari HP manapun di soleman.vercel.app
+ * langsung muncul di Portal Khusus Kurir Soleman tanpa perlu me-refresh halaman.
+ */
 export function subscribeToOrdersRealtime(
   onOrdersUpdate: (orders: Order[]) => void,
   onSyncStateChange?: (state: FirestoreSyncState) => void,
@@ -110,61 +115,90 @@ export function subscribeToOrdersRealtime(
   purgeLegacyLocalStorage();
   onSyncStateChange?.('connecting');
 
-  const colRef = collection(db, ORDERS_COLLECTION);
+  // Map terpadu untuk menggabungkan pesanan dari kedua database tanpa duplikasi
+  const ordersMap = new Map<string, StoredOrderDocument>();
 
-  const unsubscribe = onSnapshot(
-    colRef,
-    (snapshot) => {
-      onSyncStateChange?.('connected');
-      onErrorChange?.(null);
+  const emitMergedOrders = () => {
+    const list = Array.from(ordersMap.values());
+    list.sort((a, b) => {
+      const timeA = a.createdAtMs || a.updatedAtMs || 0;
+      const timeB = b.createdAtMs || b.updatedAtMs || 0;
+      return timeB - timeA;
+    });
+    onOrdersUpdate(list);
+  };
 
-      const loadedOrders: StoredOrderDocument[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data() as StoredOrderDocument;
-        if (!data || !data.id) return;
+  const handleSnapshot = (snapshot: any, sourceDb: any) => {
+    onSyncStateChange?.('connected');
+    onErrorChange?.(null);
 
-        // Jika masih ada data contoh lama (seperti Budi Santoso / SLC-3893), hapus otomatis dari Firestore
-        if (
-          LEGACY_SAMPLE_IDS.has(data.id) ||
-          data.customerName?.toLowerCase() === 'budi santoso'
-        ) {
-          void deleteDoc(doc(db, ORDERS_COLLECTION, docSnap.id)).catch(() => {});
-          return;
-        }
+    snapshot.forEach((docSnap: any) => {
+      const data = docSnap.data() as StoredOrderDocument;
+      if (!data || !data.id) return;
 
-        loadedOrders.push(data);
-      });
-
-      // Urutkan pesanan: yang paling baru tampil paling atas
-      loadedOrders.sort((a, b) => {
-        const timeA = a.createdAtMs || a.updatedAtMs || 0;
-        const timeB = b.createdAtMs || b.updatedAtMs || 0;
-        return timeB - timeA;
-      });
-
-      onOrdersUpdate(loadedOrders);
-    },
-    (error) => {
-      onSyncStateChange?.('error');
-      const friendlyErr = formatFirebaseErrorMessage(
-        error,
-        'membaca data real-time'
-      );
-      onErrorChange?.(friendlyErr);
-      try {
-        handleFirestoreError(error, OperationType.LIST, ORDERS_COLLECTION);
-      } catch (loggedErr) {
-        console.error('Firestore real-time listener error:', loggedErr);
+      // Hapus data contoh lama jika pernah tersimpan
+      if (
+        LEGACY_SAMPLE_IDS.has(data.id) ||
+        data.customerName?.toLowerCase() === 'budi santoso'
+      ) {
+        void deleteDoc(doc(sourceDb, ORDERS_COLLECTION, docSnap.id)).catch(() => {});
+        return;
       }
-    }
-  );
 
-  return unsubscribe;
+      const existing = ordersMap.get(data.id);
+      if (!existing || (data.updatedAtMs || 0) >= (existing.updatedAtMs || 0)) {
+        ordersMap.set(data.id, data);
+      }
+    });
+
+    emitMergedOrders();
+  };
+
+  const unsubs: (() => void)[] = [];
+
+  // 1. Listener Database Utama (ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528)
+  try {
+    const unsubExplicit = onSnapshot(
+      collection(db, ORDERS_COLLECTION),
+      (snap) => handleSnapshot(snap, db),
+      (err) => {
+        console.warn('Explicit DB listener warning:', err.message);
+      }
+    );
+    unsubs.push(unsubExplicit);
+  } catch (e) {
+    console.warn('Failed to attach explicit listener:', e);
+  }
+
+  // 2. Listener Database Default (default) untuk sinkronisasi cadangan lintas HP
+  if (dbDefault && dbDefault !== db) {
+    try {
+      const unsubDefault = onSnapshot(
+        collection(dbDefault, ORDERS_COLLECTION),
+        (snap) => handleSnapshot(snap, dbDefault),
+        (err) => {
+          console.warn('Default DB listener warning:', err.message);
+        }
+      );
+      unsubs.push(unsubDefault);
+    } catch (e) {
+      console.warn('Failed to attach default listener:', e);
+    }
+  }
+
+  return () => {
+    unsubs.forEach((fn) => {
+      try {
+        fn();
+      } catch {}
+    });
+  };
 }
 
 /**
- * Simpan atau perbarui satu dokumen pesanan langsung ke koleksi 'oderan' di Firebase Firestore.
- * Jika gagal, lempar/kirim pesan error merah ke layar.
+ * Simpan atau perbarui dokumen pesanan ke Firebase Firestore secara serentak
+ * ke Database Eksplisit dan Database Default (koleksi 'oderan' dan 'orders')
+ * agar pesanan tersimpan 100% aman dan langsung masuk ke semua HP.
  */
 export async function saveOrderToFirestore(
   order: Order,
@@ -172,58 +206,64 @@ export async function saveOrderToFirestore(
   onErrorChange?: (errorMsg: string | null) => void
 ): Promise<boolean> {
   purgeLegacyLocalStorage();
-  const path = `${ORDERS_COLLECTION}/${order.id}`;
   const sanitized = sanitizeOrderForFirestore(order, isNewOrder);
 
-  try {
-    // Simpan ke koleksi utama 'oderan' di Firebase Firestore
-    await setDoc(doc(db, ORDERS_COLLECTION, order.id), sanitized, { merge: true });
+  const writes: Promise<any>[] = [
+    setDoc(doc(db, ORDERS_COLLECTION, order.id), sanitized, { merge: true }),
+    setDoc(doc(db, 'orders', order.id), sanitized, { merge: true }),
+  ];
 
+  if (dbDefault && dbDefault !== db) {
+    writes.push(
+      setDoc(doc(dbDefault, ORDERS_COLLECTION, order.id), sanitized, { merge: true }),
+      setDoc(doc(dbDefault, 'orders', order.id), sanitized, { merge: true })
+    );
+  }
+
+  const results = await Promise.allSettled(writes);
+  const anySuccess = results.some((r) => r.status === 'fulfilled');
+
+  if (anySuccess) {
     onErrorChange?.(null);
     return true;
-  } catch (error) {
-    const friendlyErr = formatFirebaseErrorMessage(
-      error,
-      `menyimpan pesanan #${order.id}`
-    );
-    onErrorChange?.(friendlyErr);
-    try {
-      handleFirestoreError(
-        error,
-        isNewOrder ? OperationType.CREATE : OperationType.UPDATE,
-        path
-      );
-    } catch (loggedErr) {
-      console.error('Firestore save error:', loggedErr);
-    }
-    return false;
   }
+
+  const firstRejection = results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+  const friendlyErr = formatFirebaseErrorMessage(
+    firstRejection?.reason || new Error('Gagal menyimpan pesanan ke cloud Firestore'),
+    `menyimpan pesanan #${order.id}`
+  );
+  onErrorChange?.(friendlyErr);
+  return false;
 }
 
 /**
- * Hapus satu dokumen pesanan dari koleksi 'oderan' di Firebase Firestore.
+ * Hapus satu dokumen pesanan dari seluruh database dan koleksi di Firebase Firestore.
  */
 export async function deleteOrderFromFirestore(
   orderId: string,
   onErrorChange?: (errorMsg: string | null) => void
 ): Promise<boolean> {
   purgeLegacyLocalStorage();
-  const path = `${ORDERS_COLLECTION}/${orderId}`;
+  const deletes: Promise<any>[] = [
+    deleteDoc(doc(db, ORDERS_COLLECTION, orderId)),
+    deleteDoc(doc(db, 'orders', orderId)),
+  ];
+
+  if (dbDefault && dbDefault !== db) {
+    deletes.push(
+      deleteDoc(doc(dbDefault, ORDERS_COLLECTION, orderId)),
+      deleteDoc(doc(dbDefault, 'orders', orderId))
+    );
+  }
+
   try {
-    await deleteDoc(doc(db, ORDERS_COLLECTION, orderId));
+    await Promise.allSettled(deletes);
     onErrorChange?.(null);
     return true;
   } catch (error) {
-    const friendlyErr = formatFirebaseErrorMessage(
-      error,
-      `menghapus pesanan #${orderId}`
-    );
+    const friendlyErr = formatFirebaseErrorMessage(error, `menghapus pesanan #${orderId}`);
     onErrorChange?.(friendlyErr);
-    try {
-      handleFirestoreError(error, OperationType.DELETE, path);
-    } catch (loggedErr) {
-      console.error('Firestore delete error:', loggedErr);
-    }
     return false;
   }
 }

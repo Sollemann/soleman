@@ -453,7 +453,7 @@ ${serviceList}`;
     : `Rp ${order.deliveryFee.toLocaleString('id-ID')} (${order.distanceZone === 'luar_cirebon' ? 'Ekspedisi J&T Express' : 'Ongkir Jarak Jauh Grab/Maxim/Kurir'})`;
 
   const courierToken = encodeOrderForCourierLink(order);
-  const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://soleman-cirebon.app';
+  const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://soleman.vercel.app';
   const courierDirectLinkText = courierToken
     ? `\n\n⚡ *LINK TERIMA CEPAT PORTAL KURIR SOLEMAN:*\n${originUrl}/?kurir_order=${courierToken}`
     : '';
@@ -614,7 +614,7 @@ export function buildNotifyCourierWhatsAppUrl(order: Order, courierPhone: string
     : `💳 QRIS (Non-Tunai)`;
 
   const courierToken = encodeOrderForCourierLink(order);
-  const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://soleman-cirebon.app';
+  const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://soleman.vercel.app';
   const directLink = courierToken ? `\n\n⚡ *KLIK BUKA DI PORTAL KURIR:*\n${originUrl}/?kurir_order=${courierToken}` : '';
 
   const message = `*SURAT TUGAS PENJEMPUTAN KURIR SOLEMAN* 🛵📋
