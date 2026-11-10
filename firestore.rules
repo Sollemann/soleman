@@ -49,30 +49,21 @@ service cloud.firestore {
       allow get: if isValidId(docId);
     }
 
-    // Primary real-time collection 'oderan' synchronized across all phones
+    // Primary real-time collection 'oderan' synchronized across all phones publicly
     match /oderan/{orderId} {
-      allow get: if isValidId(orderId);
-      allow list: if resource.data.id is string && resource.data.id.size() <= 64;
-      allow create: if isValidId(orderId) && isValidOrderPayload(incoming());
-      allow update: if isValidId(orderId) && isValidOrderPayload(incoming());
-      allow delete: if isValidId(orderId);
+      allow read: if true;
+      allow create, update, delete: if isValidId(orderId);
     }
 
     // Alias 'orderan' & 'orders' collections
     match /orderan/{orderId} {
-      allow get: if isValidId(orderId);
-      allow list: if resource.data.id is string && resource.data.id.size() <= 64;
-      allow create: if isValidId(orderId) && isValidOrderPayload(incoming());
-      allow update: if isValidId(orderId) && isValidOrderPayload(incoming());
-      allow delete: if isValidId(orderId);
+      allow read: if true;
+      allow create, update, delete: if isValidId(orderId);
     }
 
     match /orders/{orderId} {
-      allow get: if isValidId(orderId);
-      allow list: if resource.data.id is string && resource.data.id.size() <= 64;
-      allow create: if isValidId(orderId) && isValidOrderPayload(incoming());
-      allow update: if isValidId(orderId) && isValidOrderPayload(incoming());
-      allow delete: if isValidId(orderId);
+      allow read: if true;
+      allow create, update, delete: if isValidId(orderId);
     }
   }
 }

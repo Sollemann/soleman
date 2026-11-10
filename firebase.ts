@@ -13,11 +13,11 @@ import {
   getDocFromServer,
   Firestore,
 } from 'firebase/firestore';
-// ID Database Firestore Eksplisit sesuai permintaan pengguna
-export const FIRESTORE_DATABASE_ID = 'ai-studio-soleman-a9ae4e15-e9c1-4a53-891d-a685b5451526';
+// ID Database Firestore Eksplisit aktif di project soleman-cirebon
+export const FIRESTORE_DATABASE_ID = 'ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528';
 
 // Konfigurasi resmi Firebase Soleman Cirebon tertulis langsung di dalam kode sumber
-// agar berjalan 100% normal tanpa bergantung pada env variable lokal AI Studio saat di-deploy ke Vercel
+// agar berjalan 100% normal tanpa bergantung pada env variable lokal AI Studio saat di-deploy ke Vercel (soleman.vercel.app)
 export const firebaseConfig = {
   apiKey: 'AIzaSyBXyZHxsA5M_FRgMkD1qTw_6cvX87gzzbY',
   authDomain: 'soleman-cirebon.firebaseapp.com',
@@ -26,6 +26,7 @@ export const firebaseConfig = {
   messagingSenderId: '386040967503',
   appId: '1:386040967503:web:7780bf3e3bb7720ebb953a',
   measurementId: 'G-FXQB2BDTFC',
+  firestoreDatabaseId: FIRESTORE_DATABASE_ID,
 };
 
 // Initialize Firebase App
@@ -43,7 +44,7 @@ export const analyticsPromise =
 export const auth = getAuth(app);
 
 // Inisialisasi Firebase Firestore dengan ID Database eksplisit:
-// getFirestore(app, 'ai-studio-soleman-a9ae4e15-e9c1-4a53-891d-a685b5451526')
+// getFirestore(app, 'ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528')
 let firestoreInstance: Firestore;
 try {
   firestoreInstance = initializeFirestore(
@@ -110,13 +111,13 @@ export function handleFirestoreError(
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Validate connection to Firestore (default) on boot
+// Validate connection to Firestore on boot
 export async function testFirestoreConnection(): Promise<{
   ok: boolean;
   errorMessage?: string;
 }> {
   try {
-    await getDocFromServer(doc(db, 'oderan', '__connection_test__'));
+    await getDocFromServer(doc(db, 'oderan', 'connection-test'));
     return { ok: true };
   } catch (error) {
     const rawMsg = error instanceof Error ? error.message : String(error);

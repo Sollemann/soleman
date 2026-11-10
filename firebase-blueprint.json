@@ -2,7 +2,7 @@
   "entities": {
     "Order": {
       "title": "Order",
-      "description": "Data pesanan reparasi dan antar-jemput sepatu Soleman Cirebon yang disimpan di koleksi oderan pada Firebase Firestore (default) dan disinkronkan secara real-time di semua HP.",
+      "description": "Data pesanan reparasi dan antar-jemput sepatu Soleman Cirebon yang disimpan di koleksi oderan pada Firebase Firestore (ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528) dan disinkronkan secara real-time di semua HP.",
       "type": "object",
       "properties": {
         "id": {

@@ -90,11 +90,18 @@ export const App: React.FC = () => {
   // Count pending unaccepted orders
   const pendingOrdersCount = orders.filter(o => !o.isAcceptedByAdmin).length;
 
-  // Real-time Firebase Firestore (default) synchronization pada koleksi 'oderan'
+  // Real-time Firebase Firestore synchronization pada koleksi 'oderan'
   useEffect(() => {
     purgeLegacyLocalStorage();
+    let prevCount: number | null = null;
     const unsubscribeFirestore = subscribeToOrdersRealtime(
       (liveOrders) => {
+        if (prevCount !== null && liveOrders.length > prevCount) {
+          try {
+            soundFx.playSuccess();
+          } catch {}
+        }
+        prevCount = liveOrders.length;
         setOrders(liveOrders);
       },
       (syncState) => {
