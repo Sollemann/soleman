@@ -90,16 +90,21 @@ export const App: React.FC = () => {
   // Count pending unaccepted orders
   const pendingOrdersCount = orders.filter(o => !o.isAcceptedByAdmin).length;
 
-  // Persist orders to localStorage
+  // Persist orders to localStorage & broadcast across tabs immediately
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('solcreft_orders_channel');
+        bc.postMessage({ type: 'ORDERS_UPDATED', orders });
+        bc.close();
+      }
     } catch (e) {
       console.warn('Failed to save orders to localStorage', e);
     }
   }, [orders]);
 
-  // Real-time cross-tab synchronization so customer Sherlock & Patokan immediately appear on Courier Dashboard
+  // Real-time cross-tab synchronization + URL ?kurir_order= automatic capture
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
@@ -114,18 +119,68 @@ export const App: React.FC = () => {
       }
     };
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      bc = new BroadcastChannel('solcreft_orders_channel');
+      bc.onmessage = (ev) => {
+        if (ev.data?.type === 'ORDERS_UPDATED' && Array.isArray(ev.data.orders)) {
+          setOrders(ev.data.orders);
+        }
+      };
+    }
+
+    // Check URL parameter ?kurir_order= from WhatsApp link
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const kurirToken = params.get('kurir_order');
+      if (kurirToken) {
+        import('./services/whatsappHelper').then(({ decodeOrderFromCourierLink }) => {
+          const decodedOrder = decodeOrderFromCourierLink(kurirToken, courierUser?.name || 'Kurir Soleman');
+          if (decodedOrder) {
+            setOrders((prev) => {
+              const exists = prev.some((o) => o.id === decodedOrder.id);
+              if (exists) {
+                return prev.map((o) => (o.id === decodedOrder.id ? { ...decodedOrder, isAcceptedByAdmin: o.isAcceptedByAdmin, status: o.status } : o));
+              }
+              return [decodedOrder, ...prev];
+            });
+            // Bersihkan parameter URL tanpa reload
+            const cleanUrl = window.location.pathname + window.location.hash;
+            window.history.replaceState({}, document.title, cleanUrl);
+            if (!courierAuthService.getCurrentUser() && !adminAuthService.getCurrentUser()) {
+              setIsCourierLoginModalOpen(true);
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to parse kurir_order URL param', err);
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      if (bc) bc.close();
+    };
   }, []);
 
-  // Handle adding new order
+  // Handle adding new order (or updating if ID already exists)
   const handleOrderCreated = (newOrder: Order) => {
     const orderWithCustomer = customerUser && !newOrder.customerId
       ? { ...newOrder, customerId: customerUser.id }
       : newOrder;
-    setOrders(prev => [orderWithCustomer, ...prev]);
+    setOrders(prev => {
+      const existingIdx = prev.findIndex(o => o.id.toUpperCase() === orderWithCustomer.id.toUpperCase());
+      if (existingIdx !== -1) {
+        const updated = [...prev];
+        updated[existingIdx] = orderWithCustomer;
+        return updated;
+      }
+      return [orderWithCustomer, ...prev];
+    });
   };
 
-  // Handle accepting order by Admin
+  // Handle accepting order by Admin or Courier Soleman
   const handleAcceptOrder = (orderId: string, courierName: string = 'Kurir Soleman', courierPhone: string = '08814519955') => {
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
     setOrders(prev => prev.map(order => {
@@ -133,9 +188,9 @@ export const App: React.FC = () => {
 
       const acceptTimeline = {
         status: 'perjalanan_workshop' as OrderStatus,
-        label: 'Pesanan Diterima Admin',
+        label: 'Pesanan Diterima & Kurir Meluncur',
         timestamp: timeStr,
-        description: `Pesanan diterima & dikonfirmasi oleh Admin. ${courierName} ditugaskan untuk penjemputan.`
+        description: `Pesanan diterima di Portal Kurir. ${courierName} sedang meluncur ke titik penjemputan (${order.location.landmark || order.location.areaName}).`
       };
 
       return {
@@ -148,6 +203,35 @@ export const App: React.FC = () => {
         timeline: [acceptTimeline, ...order.timeline]
       };
     }));
+  };
+
+  // Handle updating full order details (e.g. physical shoe inspection by Courier Soleman)
+  const handleUpdateOrderDetails = (orderId: string, updatedFields: Partial<Order>, logNote?: string) => {
+    const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+    setOrders(prev => prev.map(order => {
+      if (order.id !== orderId) return order;
+      const nextTimeline = logNote
+        ? [
+            {
+              status: updatedFields.status || order.status,
+              label: 'Data Pesanan / Cek Fisik Diperbarui Kurir',
+              timestamp: timeStr,
+              description: logNote,
+            },
+            ...order.timeline,
+          ]
+        : order.timeline;
+      return {
+        ...order,
+        ...updatedFields,
+        timeline: nextTimeline,
+      };
+    }));
+  };
+
+  // Handle deleting/removing order from portal
+  const handleDeleteOrder = (orderId: string) => {
+    setOrders(prev => prev.filter(o => o.id !== orderId));
   };
 
   // Handle rejecting order by Admin
@@ -186,6 +270,7 @@ export const App: React.FC = () => {
 
       return {
         ...order,
+        isAcceptedByAdmin: true,
         status: newStatus,
         timeline: [newTimelineItem, ...order.timeline]
       };
@@ -406,6 +491,7 @@ export const App: React.FC = () => {
   // 2. TAMPILAN KHUSUS KURIR SOLEMAN (Fokus HANYA Fitur Kurir, Tanpa Landing Pelanggan)
   // =========================================================================
   if (courierUser) {
+    const incomingPickupCount = orders.filter(o => o.status === 'menunggu_jemput' || !o.isAcceptedByAdmin).length;
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
         {/* Dedicated Courier Portal Header Bar */}
@@ -414,14 +500,18 @@ export const App: React.FC = () => {
             <div className="flex items-center gap-3">
               <SolemanLogo size="sm" />
               <div className="border-l border-slate-700 pl-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 px-2.5 py-0.5 rounded-full">
                     Portal Khusus Kurir Soleman
                   </span>
-                  <span className="text-xs font-bold text-white hidden sm:inline">Rute & Antar-Jemput</span>
+                  {incomingPickupCount > 0 && (
+                    <span className="text-[10px] font-black bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-full animate-pulse">
+                      {incomingPickupCount} Pesanan Siap Jemput
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
-                  Petugas Kurir: <strong className="text-amber-400">{courierUser.name}</strong> (@{courierUser.username})
+                  Petugas Kurir: <strong className="text-amber-400">{courierUser.name}</strong> • Armada Aktif Cirebon
                 </div>
               </div>
             </div>
@@ -429,11 +519,11 @@ export const App: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleCourierLogout}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 font-bold text-xs transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 font-bold text-xs transition-all cursor-pointer"
                 title="Keluar dari portal Kurir"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span>Keluar (Logout Kurir)</span>
+                <span>Keluar Portal</span>
               </button>
             </div>
           </div>
@@ -444,9 +534,13 @@ export const App: React.FC = () => {
           <CourierDashboard
             courierUser={courierUser}
             orders={orders}
+            onAcceptOrder={handleAcceptOrder}
+            onOrderCreated={handleOrderCreated}
             onUpdateOrderStatus={handleUpdateOrderStatus}
             onUpdatePaymentStatus={handleUpdatePaymentStatus}
             onUpdateOrderLocation={handleUpdateOrderLocation}
+            onUpdateOrderDetails={handleUpdateOrderDetails}
+            onDeleteOrder={handleDeleteOrder}
             onLogout={handleCourierLogout}
           />
         </main>

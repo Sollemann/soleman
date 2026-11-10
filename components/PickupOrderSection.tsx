@@ -365,11 +365,11 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       ? `https://www.google.com/maps?q=${finalLat},${finalLng}`
       : parsedShareLoc.cleanUrl
       ? parsedShareLoc.cleanUrl
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((cleanLandmark ? cleanLandmark + ', ' : '') + cleanArea + ', Cirebon')}`;
+      : undefined;
 
     const finalFullAddress = cleanLandmark
       ? `${cleanLandmark} (Kec. ${cleanArea})`
-      : `Kec. ${cleanArea} (Share Loc WA)`;
+      : `Kec. ${cleanArea} (Sherlock Asli di Fitur WA Kurir)`;
 
     const newOrder: Order = {
       id: `SLC-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -412,8 +412,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       deliveryFee,
       totalAmount: grandTotal,
       status: 'menunggu_jemput',
-      isAcceptedByAdmin: true,
-      acceptedAt: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) + ' WIB',
+      isAcceptedByAdmin: false,
       createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
       estimatedFinishedAt: '1 - 3 Hari Kerja',
       technicianName: 'Master Teknisi Soleman',
@@ -496,8 +495,30 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                 Order #{createdOrder.id} - Siap Dijemput Kurir Soleman
               </h3>
               <p className="text-xs text-emerald-300 leading-relaxed">
-                Rincian {createdOrder.pairsCount} pasang sepatu dan metode pembayaran <strong className="text-white uppercase">{createdOrder.paymentMethod}</strong> (Total Rp {createdOrder.totalAmount.toLocaleString('id-ID')}) telah masuk ke sistem. Tinggal kirim Share Loc ke WhatsApp Kurir Soleman!
+                Rincian {createdOrder.pairsCount} pasang sepatu, patokan lokasi, dan metode pembayaran <strong className="text-white uppercase">{createdOrder.paymentMethod}</strong> (Total Rp {createdOrder.totalAmount.toLocaleString('id-ID')}) telah masuk otomatis ke Dashboard Kurir. Sekarang kirimkan <strong>Sherlock Asli lewat fitur 📍 Lokasi bawaan WhatsApp</strong> di chat Kurir Soleman!
               </p>
+            </div>
+          </div>
+
+          {/* Panduan Penting Kirim Sherlock Asli di Fitur WhatsApp */}
+          <div className="p-4 rounded-2xl bg-slate-950/90 border border-emerald-500/40 space-y-2.5 text-xs">
+            <div className="flex items-center gap-2 font-black text-emerald-400 uppercase tracking-wider">
+              <MapPin className="w-4 h-4 text-emerald-400" />
+              <span>Cara Kirim Sherlock Asli di Fitur WhatsApp Kurir Agar 100% Akurat:</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-300">
+              <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                <strong className="text-amber-400 block mb-0.5">1. Buka Chat WA Kurir</strong>
+                Klik tombol hijau WhatsApp di bawah untuk mengirim pesan order & patokan rumah Anda.
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                <strong className="text-emerald-400 block mb-0.5">2. Klik Ikon 📎 Lampiran WA</strong>
+                Di ruang chat WA Kurir, tekan ikon <strong>📎 (Klip Kertas / +)</strong> lalu pilih menu <strong>📍 Lokasi (Location)</strong>.
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                <strong className="text-sky-400 block mb-0.5">3. Kirim Lokasi Saat Ini</strong>
+                Pilih <strong>"Kirim Lokasi Anda Saat Ini"</strong> atau <strong>"Berbagi Lokasi Terkini"</strong> langsung ke Kurir!
+              </div>
             </div>
           </div>
 
@@ -530,6 +551,15 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           )}
 
           <div className="flex flex-wrap gap-3 pt-2">
+            <a
+              href={buildNewOrderWhatsAppUrl(createdOrder)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/25"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>Buka WA Kurir & Kirim Sherlock Asli (📎 ➔ 📍 Lokasi)</span>
+            </a>
             <button
               onClick={onOpenDashboard}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20 transition-all"
@@ -537,15 +567,6 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
               <span>Lacak Progres di Sistem</span>
               <ChevronRight className="w-4 h-4" />
             </button>
-            <a
-              href={buildNewOrderWhatsAppUrl(createdOrder)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Kirim & Share Loc via WhatsApp (0881-4519-955)</span>
-            </a>
           </div>
         </div>
       )}
@@ -1197,26 +1218,22 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                   )}
                 </div>
 
-                {/* HIGHLIGHT: SHERLOCK & PATOKAN DI WA -> OTOMATIS KE DASHBOARD KURIR SECARA AKURAT */}
+                {/* HIGHLIGHT: KIRIM SHERLOCK ASLI YANG ADA DI FITUR WA LANGSUNG KE KURIR AGAR AKURAT */}
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/50 via-slate-950 to-slate-950 border border-emerald-500/40 space-y-3.5">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
-                      <Share2 className="w-4 h-4 text-emerald-400" />
-                      <span>Sherlock (Share Loc) & Patokan WA → Otomatis ke Dashboard Kurir</span>
+                      <MapPin className="w-4 h-4 text-emerald-400" />
+                      <span>Kirim Sherlock Asli Lewat Fitur 📍 Lokasi di WhatsApp Kurir</span>
                     </div>
                     <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-                      Sinkron Akurat Real-Time
+                      100% Akurat Sampai Depan Rumah
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Isi <strong>Patokan Lokasi</strong> di bawah ini dan/atau kunci <strong>Titik Sherlock GPS</strong> Anda. Saat Anda memesan via WhatsApp, titik Sherlock & Patokan Anda langsung masuk secara otomatis dan akurat ke <strong>Dashboard Kurir Soleman</strong> untuk navigasi penjemputan!
-                  </p>
-
-                  {/* 1. Patokan Rumah / Ciri-Ciri Lokasi (Prioritas Utama untuk Kurir) */}
+                  {/* 1. Patokan Rumah / Ciri-Ciri Lokasi (Otomatis Masuk ke Dashboard Kurir) */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-extrabold uppercase tracking-wider text-amber-300">
-                      🚩 Patokan Lokasi / Ciri-Ciri Rumah (Sinkron ke WA & Dashboard Kurir) *
+                      🚩 Patokan Rumah / Ciri-Ciri Lokasi (Otomatis Masuk ke Dashboard Kurir) *
                     </label>
                     <input
                       type="text"
@@ -1226,62 +1243,53 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                       className="w-full bg-slate-900 border border-amber-500/40 focus:border-amber-400 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none"
                     />
                     <span className="text-[10px] text-slate-400 block">
-                      Patokan ini langsung tampil di surat jalan WA dan kartu navigasi Dashboard Kurir.
+                      Patokan ini otomatis tercatat di Dashboard Kurir dan di pesan WhatsApp Anda.
                     </span>
                   </div>
 
-                  {/* 2. Tombol Kunci Sherlock GPS Otomatis + Link Share Loc WA */}
-                  <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <span className="text-xs font-bold text-white block">
-                          🛰️ Kunci Titik Koordinat Sherlock Akurat (Opsional 1-Klik)
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          Agar peta di Dashboard Kurir langsung mengarah tepat ke depan rumah Anda:
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleDetectSherlockGps}
-                        disabled={isLocatingGps}
-                        className="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md flex items-center justify-center gap-1.5 shrink-0 cursor-pointer transition-all"
-                      >
-                        <Navigation className="w-3.5 h-3.5 fill-slate-950" />
-                        <span>{isLocatingGps ? 'Mengunci GPS...' : gpsCoords ? 'Perbarui Titik Sherlock' : 'Kunci Sherlock GPS Saya'}</span>
-                      </button>
+                  {/* 2. Visual Panduan Fitur Sherlock Asli Bawaan WhatsApp */}
+                  <div className="p-3.5 rounded-xl bg-slate-900/95 border border-emerald-500/30 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                        <span>📲 Cara Kirim Sherlock Asli yang Ada di Fitur WhatsApp ke Kurir:</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold">WA: 0881-4519-955</span>
                     </div>
 
-                    {gpsStatusMsg && (
-                      <div className={`p-2 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 ${
-                        gpsCoords
-                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                          : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                      }`}>
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                        <span>{gpsStatusMsg}</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                      <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+                        <span className="inline-block px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">
+                          Langkah 1
+                        </span>
+                        <p className="text-slate-200 font-semibold leading-snug">
+                          Klik tombol <strong>"Pesan & Kirim Sherlock Asli di WA"</strong> di bawah.
+                        </p>
                       </div>
-                    )}
 
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 mb-1">
-                        Atau Tempel Link Share Loc WhatsApp / Google Maps (Jika Sudah Ada):
-                      </label>
-                      <input
-                        type="text"
-                        value={waShareLocLink}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setWaShareLocLink(val);
-                          const parsed = parseShareLocInput(val);
-                          if (parsed.lat && parsed.lng) {
-                            setGpsCoords({ lat: parsed.lat, lng: parsed.lng, accuracy: 10 });
-                            setGpsStatusMsg(`✓ Koordinat dari Link Share Loc Terbaca (${parsed.lat}, ${parsed.lng})!`);
-                          }
-                        }}
-                        placeholder="Contoh: https://maps.google.com/?q=-6.715,108.552 (Boleh dikosongkan, bisa Share Loc di chat WA)"
-                        className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-400 rounded-xl px-3 py-2 text-[11px] text-white placeholder-slate-500 focus:outline-none font-mono"
-                      />
+                      <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+                        <span className="inline-block px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
+                          Langkah 2 (Fitur WA)
+                        </span>
+                        <p className="text-slate-200 font-semibold leading-snug">
+                          Di chat WA Kurir, tekan ikon <strong>📎 (Lampiran / +)</strong> lalu pilih <strong>📍 Lokasi</strong>.
+                        </p>
+                      </div>
+
+                      <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-1">
+                        <span className="inline-block px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold text-[10px]">
+                          Langkah 3 (Akurat)
+                        </span>
+                        <p className="text-slate-200 font-semibold leading-snug">
+                          Tap <strong>"Kirim Lokasi Anda Saat Ini"</strong> atau <strong>"Berbagi Lokasi Terkini"</strong>.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>
+                        Dengan mengirim <strong>Sherlock Asli dari fitur 📍 Lokasi di dalam WhatsApp</strong>, titik rumah Anda langsung terbaca akurat oleh Kurir Soleman tanpa meleset!
+                      </span>
                     </div>
                   </div>
                 </div>
