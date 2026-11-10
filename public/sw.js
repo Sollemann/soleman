@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-const CACHE_NAME = 'soleman-cirebon-v2';
+const CACHE_NAME = 'soleman-cirebon-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
