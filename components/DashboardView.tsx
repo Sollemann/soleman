@@ -23,7 +23,7 @@ import {
   FileCheck
 } from 'lucide-react';
 import { Order, OrderStatus } from '../types';
-import { STATUS_LABELS, WORKSHOP_INFO } from '../data/solcreftData';
+import { STATUS_LABELS, WORKSHOP_INFO, getServiceTierDetail } from '../data/solcreftData';
 import { buildConsultationWhatsAppUrl } from '../services/whatsappHelper';
 
 interface DashboardViewProps {
@@ -218,13 +218,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <FileCheck className="w-3.5 h-3.5" /> Layanan Yang Dikerjakan
                 </span>
 
-                <div className="space-y-2 text-xs">
-                  {foundOrder.selectedServices.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between text-slate-300">
-                      <span>• {s.name}</span>
-                      <span className="text-amber-400 font-mono font-semibold">{s.priceFormatted}</span>
-                    </div>
-                  ))}
+                <div className="space-y-2.5 text-xs">
+                  {foundOrder.selectedServices.map((s) => {
+                    const orderSev = foundOrder.severity || (foundOrder.shoes && foundOrder.shoes[0]?.severity) || 'normal';
+                    const tier = getServiceTierDetail(s, orderSev);
+                    return (
+                      <div key={s.id} className="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 space-y-1">
+                        <div className="flex items-center justify-between text-slate-200 font-bold">
+                          <span>• {s.name}</span>
+                          <span className="text-amber-400 font-mono font-bold">{tier.priceFormatted}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-amber-300/90 font-semibold">{tier.badge}: {tier.label}</span>
+                          <span className="text-slate-500">{tier.durationEst}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 leading-snug">{tier.damageDesc}</p>
+                      </div>
+                    );
+                  })}
 
                   {foundOrder.customNotes && (
                     <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-800 italic">

@@ -39,9 +39,19 @@ export type ShoeMaterial =
   | 'Karet / EVA / Foam';
 
 export type DamageSeverity = 
-  | 'kecil'    // Kerusakan ringan / minor (ujung lepas tipis, baret halus)
-  | 'normal'   // Kerusakan sedang / standard (mangap separuh, kotor menempel, midsole kuning)
-  | 'hard';    // Kerusakan parah / berat (sol lepas total, patah terbelah, kanvas robek lebar)
+  | 'kecil'    // Tingkat Ringan / Sebagian
+  | 'normal'   // Tingkat Sedang / Standar
+  | 'hard';    // Tingkat Berat / Parah / Full Rekonstruksi
+
+export interface SeverityTierDetail {
+  severity: DamageSeverity;
+  label: string;         // Nama tingkat spesifik layanan (misal: "Ringan / Setengah Sol")
+  badge: string;         // Badge pendek: "Ringan" | "Sedang" | "Berat"
+  damageDesc: string;    // Kondisi kerusakan spesifik untuk tingkat ini
+  price: number;         // Harga pas sesuai tingkat kerusakan (IDR)
+  priceFormatted: string;// Format Rupiah (misal: "Rp 30.000")
+  durationEst: string;   // Estimasi pengerjaan untuk tingkat ini
+}
 
 export interface ServiceItem {
   id: string;
@@ -61,6 +71,7 @@ export interface ServiceItem {
   iconName: string;
   beforeAfterDescription: string;
   image: string;
+  severityTiers: Record<DamageSeverity, SeverityTierDetail>;
 }
 
 export type OrderStatus = 

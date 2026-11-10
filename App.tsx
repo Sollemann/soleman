@@ -26,7 +26,7 @@ import { ShoeRestorationShowcase } from './components/ShoeRestorationShowcase';
 import { RepairCostCalculator } from './components/RepairCostCalculator';
 import { Footer } from './components/Footer';
 import { INITIAL_ORDERS, WORKSHOP_INFO, SERVICES_CATALOG } from './data/solcreftData';
-import { Order, OrderStatus, ServiceItem, ShoeType, AdminUser, CourierUser, CustomerUser, PaymentStatus } from './types';
+import { Order, OrderStatus, ServiceItem, ShoeType, DamageSeverity, AdminUser, CourierUser, CustomerUser, PaymentStatus } from './types';
 import { adminAuthService } from './services/adminAuthService';
 import { courierAuthService } from './services/courierAuthService';
 import { customerAuthService } from './services/customerAuthService';
@@ -83,6 +83,7 @@ export const App: React.FC = () => {
   // Preselected data for Pickup Section
   const [preselectedServices, setPreselectedServices] = useState<ServiceItem[]>([]);
   const [preselectedShoeType, setPreselectedShoeType] = useState<ShoeType>('Sneakers');
+  const [preselectedSeverity, setPreselectedSeverity] = useState<DamageSeverity>('normal');
   const [preselectedPairsCount, setPreselectedPairsCount] = useState<number>(1);
   const [preselectedArea, setPreselectedArea] = useState<string>('');
 
@@ -230,8 +231,9 @@ export const App: React.FC = () => {
   }, []);
 
   // Flow handlers
-  const handleSelectServiceForPickup = (service: ServiceItem) => {
+  const handleSelectServiceForPickup = (service: ServiceItem, severity: DamageSeverity = 'normal') => {
     setPreselectedServices([service]);
+    setPreselectedSeverity(severity);
     handleScrollToSection('antar-jemput');
   };
 
@@ -240,9 +242,13 @@ export const App: React.FC = () => {
     shoeType: ShoeType;
     pairsCount: number;
     areaName: string;
+    severity?: DamageSeverity;
   }) => {
     setPreselectedServices(data.services);
     setPreselectedShoeType(data.shoeType);
+    if (data.severity) {
+      setPreselectedSeverity(data.severity);
+    }
     setPreselectedPairsCount(data.pairsCount);
     setPreselectedArea(data.areaName);
     handleScrollToSection('antar-jemput');
@@ -459,6 +465,7 @@ export const App: React.FC = () => {
         <PickupOrderSection
           initialServices={preselectedServices}
           initialShoeType={preselectedShoeType}
+          initialSeverity={preselectedSeverity}
           initialPairsCount={preselectedPairsCount}
           initialArea={preselectedArea}
           customerUser={customerUser}

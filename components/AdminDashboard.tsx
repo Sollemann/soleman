@@ -31,7 +31,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { Order, OrderStatus, AdminUser, ServiceItem, ShoeType } from '../types';
-import { STATUS_LABELS, COURIER_DRIVERS, SERVICES_CATALOG, CIREBON_AREAS, WORKSHOP_INFO } from '../data/solcreftData';
+import { STATUS_LABELS, COURIER_DRIVERS, SERVICES_CATALOG, CIREBON_AREAS, WORKSHOP_INFO, getServiceTierDetail } from '../data/solcreftData';
 import { 
   buildOrderAcceptedWhatsAppUrl, 
   buildNotifyCourierWhatsAppUrl, 
@@ -409,6 +409,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           : sh.severity === 'kecil' 
                           ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' 
                           : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+                        const sevLabelText = sh.severity === 'hard'
+                          ? 'Berat / Parah'
+                          : sh.severity === 'kecil'
+                          ? 'Ringan'
+                          : 'Sedang';
 
                         return (
                           <div key={sh.id || sIdx} className="p-2 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
@@ -417,15 +422,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 #{sIdx + 1} {sh.shoeBrand}
                               </span>
                               <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase border ${sevBadgeClass}`}>
-                                {sh.severity}
+                                {sevLabelText}
                               </span>
                             </div>
                             <div className="flex flex-wrap gap-1 text-[10px] text-slate-400">
                               <span className="px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800">{sh.shoeType}</span>
                               <span className="px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-amber-300/90">{sh.material}</span>
                             </div>
-                            <p className="text-slate-400 text-[10px] line-clamp-1">
-                              Servis: {sh.selectedServices.map(s => s.name).join(', ')}
+                            <p className="text-slate-400 text-[10px] line-clamp-2">
+                              Servis: {sh.selectedServices.map(s => {
+                                const tier = getServiceTierDetail(s, sh.severity);
+                                return `${s.name} (${tier.label} - ${tier.priceFormatted})`;
+                              }).join(', ')}
                             </p>
                             {sh.photoUrl && (
                               <div className="pt-1 flex items-center gap-2">

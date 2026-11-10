@@ -4,7 +4,7 @@
  */
 
 import { Order, OrderStatus } from '../types';
-import { WORKSHOP_INFO, STATUS_LABELS } from '../data/solcreftData';
+import { WORKSHOP_INFO, STATUS_LABELS, getServiceTierDetail } from '../data/solcreftData';
 
 /**
  * Membuat link WhatsApp untuk pemesanan servis & antar jemput baru
@@ -13,29 +13,35 @@ export function buildNewOrderWhatsAppUrl(order: Order): string {
   let shoesDetailText = '';
   if (order.shoes && order.shoes.length > 0) {
     shoesDetailText = order.shoes.map((sh, idx) => {
-      const sevLabel = sh.severity === 'kecil' ? '🟢 Kecil / Ringan' : sh.severity === 'hard' ? '🔴 Hard / Parah' : '🟡 Normal / Sedang';
-      const sList = sh.selectedServices.map(s => s.name).join(', ');
+      const sevLabel = sh.severity === 'kecil' ? '🟢 Tingkat Ringan (Sebagian)' : sh.severity === 'hard' ? '🔴 Tingkat Berat (Parah)' : '🟡 Tingkat Sedang (Standar)';
+      const sList = sh.selectedServices.map(s => {
+        const tier = getServiceTierDetail(s, sh.severity);
+        return `\n     • *${s.name}* [${tier.label}] — ${tier.priceFormatted}\n       _(Kondisi: ${tier.damageDesc})_`;
+      }).join('');
       return `👟 *SEPATU #${idx + 1}:* ${sh.shoeBrand}
   • Kategori: ${sh.shoeType}
   • Bahan Material: *${sh.material}*
   • Tingkat Kerusakan: *${sevLabel}*
-  • Layanan Reparasi: ${sList}
-  ${sh.damageNotes ? `• Keluhan Khusus: _"${sh.damageNotes}"_` : ''}
-  • Biaya Sepatu Ini: Rp ${sh.price.toLocaleString('id-ID')}`;
+  • Rincian Kerusakan & Harga:${sList}
+  ${sh.damageNotes ? `• Keluhan Khusus: _"${sh.damageNotes}"_\n  ` : ''}• Subtotal Sepatu #${idx + 1}: *Rp ${sh.price.toLocaleString('id-ID')}*`;
     }).join('\n\n');
   } else {
+    const orderSev = order.severity || 'normal';
+    const sevLabel = orderSev === 'kecil' ? '🟢 Tingkat Ringan (Sebagian)' : orderSev === 'hard' ? '🔴 Tingkat Berat (Parah)' : '🟡 Tingkat Sedang (Standar)';
     const serviceList = order.selectedServices
-      .map((s, idx) => `   ${idx + 1}. *${s.name}* (${s.priceFormatted})`)
+      .map((s, idx) => {
+        const tier = getServiceTierDetail(s, orderSev);
+        return `   ${idx + 1}. *${s.name}* [${tier.label}] (${tier.priceFormatted})\n      _${tier.damageDesc}_`;
+      })
       .join('\n');
     shoesDetailText = `👟 *DATA SEPATU:*
 - Merk/Model: *${order.shoeBrand}*
 - Kategori: ${order.shoeType}
-${order.material ? `- Bahan Material: ${order.material}` : ''}
-${order.severity ? `- Tingkat Kerusakan: ${order.severity.toUpperCase()}` : ''}
+${order.material ? `- Bahan Material: ${order.material}\n` : ''}- Tingkat Kerusakan: *${sevLabel}*
 - Jumlah: ${order.pairsCount} Pasang
 ${order.customNotes ? `- Keluhan/Catatan: _"${order.customNotes}"_` : ''}
 
-🛠️ *JENIS KERUSAKAN & LAYANAN DIPILIH:*
+🛠️ *RINCIAN KERUSAKAN & LAYANAN DIPILIH:*
 ${serviceList}`;
   }
 

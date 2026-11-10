@@ -141,7 +141,7 @@ export const TestimonialsAndFaq: React.FC = () => {
     },
     {
       q: 'Apakah lem sol di Soleman tahan air dan tidak mudah lepas lagi?',
-      a: 'Ya, 100%! Kami tidak menggunakan lem kuning sembarangan. Soleman menggunakan lem Polyurethane (PU) grade industri pabrik sepatu, dilengkapi cairan primer pengikis kotoran mikroskopis dan diproses menggunakan mesin Thermo-Press bertekanan tinggi. Kami memberikan garansi servis hingga 60 - 90 hari.'
+      a: 'Ya, 100%! Kami tidak menggunakan lem kuning sembarangan. Soleman menggunakan lem Polyurethane (PU) khusus sepatu, dilengkapi cairan primer pengikis kotoran mikroskopis dan diproses menggunakan teknik Pres Manual bertekanan merata & presisi. Kami memberikan garansi servis hingga 60 - 90 hari.'
     },
     {
       q: 'Bagaimana aturan promo Gratis Ongkir antar-jemput di Cirebon?',

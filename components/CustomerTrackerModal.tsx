@@ -26,7 +26,7 @@ import {
   Award
 } from 'lucide-react';
 import { Order } from '../types';
-import { STATUS_LABELS, WORKSHOP_INFO } from '../data/solcreftData';
+import { STATUS_LABELS, WORKSHOP_INFO, getServiceTierDetail } from '../data/solcreftData';
 import { buildConsultationWhatsAppUrl } from '../services/whatsappHelper';
 import { soundFx } from '../services/soundEffects';
 
@@ -296,25 +296,44 @@ export const CustomerTrackerModal: React.FC<CustomerTrackerModalProps> = ({
               {searchedOrder.shoes && searchedOrder.shoes.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Rincian {searchedOrder.shoes.length} Pasang Sepatu:
+                    Rincian Kerusakan & Harga ({searchedOrder.shoes.length} Pasang Sepatu):
                   </span>
-                  <div className="space-y-2">
-                    {searchedOrder.shoes.map((sh, idx) => (
-                      <div key={sh.id || idx} className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between font-bold">
-                          <span className="text-white">#{idx + 1} {sh.shoeBrand}</span>
-                          <span className="text-amber-400 font-mono">Rp {sh.price.toLocaleString('id-ID')}</span>
+                  <div className="space-y-2.5">
+                    {searchedOrder.shoes.map((sh, idx) => {
+                      const sevBadge = sh.severity === 'kecil'
+                        ? { text: 'Ringan (Sebagian)', cls: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30' }
+                        : sh.severity === 'hard'
+                        ? { text: 'Berat / Parah', cls: 'text-red-300 bg-red-500/10 border-red-500/30' }
+                        : { text: 'Sedang (Standar)', cls: 'text-amber-300 bg-amber-500/10 border-amber-500/30' };
+                      return (
+                        <div key={sh.id || idx} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="text-white">#{idx + 1} {sh.shoeBrand}</span>
+                            <span className="text-amber-400 font-mono">Rp {sh.price.toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-400">
+                            <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">{sh.shoeType}</span>
+                            <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-amber-300">{sh.material}</span>
+                            <span className={`px-2 py-0.5 rounded border font-bold ${sevBadge.cls}`}>Tingkat: {sevBadge.text}</span>
+                          </div>
+                          <div className="space-y-1.5 pt-1 border-t border-slate-900">
+                            {sh.selectedServices.map(s => {
+                              const tier = getServiceTierDetail(s, sh.severity);
+                              return (
+                                <div key={s.id} className="flex items-start justify-between gap-2 text-[11px]">
+                                  <div>
+                                    <span className="font-semibold text-slate-200">{s.name}</span>
+                                    <span className="text-[10px] text-amber-300 ml-1.5">({tier.label})</span>
+                                    <p className="text-[10px] text-slate-500">{tier.damageDesc}</p>
+                                  </div>
+                                  <span className="font-mono font-bold text-slate-300 shrink-0">{tier.priceFormatted}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-400">
-                          <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">{sh.shoeType}</span>
-                          <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-amber-300">{sh.material}</span>
-                          <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-sky-300">Tingkat: {sh.severity.toUpperCase()}</span>
-                        </div>
-                        <p className="text-[11px] text-slate-300">
-                          Servis: {sh.selectedServices.map(s => s.name).join(', ')}
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

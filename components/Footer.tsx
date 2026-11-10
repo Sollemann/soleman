@@ -28,7 +28,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onStaffAccess }) => 
             <SolemanLogo size="md" onStaffAccess={onStaffAccess} />
 
             <p className="text-xs text-slate-400 leading-relaxed max-w-sm">
-              Solusi tuntas untuk reglue sol menganga, jahit sol keliling, resoling baru, unyellowing, deep clean, dan restorasi bahan kulit/kanvas dengan teknologi thermo-press standar pabrik di Cirebon.
+              Solusi tuntas untuk reglue sol menganga, jahit sol keliling, resoling baru, unyellowing, deep clean, dan restorasi bahan kulit/kanvas dengan pengerjaan pres manual presisi di Cirebon.
             </p>
 
             <div className="pt-2 text-xs text-slate-300 space-y-1.5">

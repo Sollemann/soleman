@@ -271,9 +271,9 @@ export const Hero: React.FC<HeroProps> = ({
                       3
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-slate-200">Pengerjaan Standar Pabrik & Garansi</h4>
+                      <h4 className="text-sm font-bold text-slate-200">Pengerjaan Presisi & Bergaransi</h4>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Teknisi berpengalaman, lem polyurethane thermo-press, jahitan sol wax anti-lepas, dan garansi resmi hingga 90 hari.
+                        Teknisi berpengalaman, lem polyurethane pres manual, jahitan sol wax anti-lepas, dan garansi resmi hingga 90 hari.
                       </p>
                     </div>
                   </div>

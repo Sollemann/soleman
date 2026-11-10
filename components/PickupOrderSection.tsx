@@ -33,7 +33,8 @@ import {
   WORKSHOP_INFO, 
   SHOE_MATERIALS, 
   DAMAGE_SEVERITIES, 
-  calculateServicePrice 
+  calculateServicePrice,
+  getServiceTierDetail
 } from '../data/solcreftData';
 import { SolemanQrModal } from './SolemanQrModal';
 import { 
@@ -67,6 +68,7 @@ interface PickupOrderSectionProps {
   initialShoeType?: ShoeType;
   initialPairsCount?: number;
   initialArea?: string;
+  initialSeverity?: DamageSeverity;
   customerUser?: CustomerUser | null;
   onOrderCreated: (order: Order) => void;
   onOpenDashboard: () => void;
@@ -91,6 +93,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   initialShoeType,
   initialPairsCount,
   initialArea,
+  initialSeverity,
   customerUser,
   onOrderCreated,
   onOpenDashboard
@@ -118,12 +121,35 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       shoeBrand: '',
       shoeType: initialShoeType || 'Sneakers',
       material: 'Canvas / Kain',
-      severity: 'normal',
+      severity: initialSeverity || 'normal',
       serviceIds: initialServices && initialServices.length > 0 ? initialServices.map(s => s.id) : ['jahit-benang-tersembunyi'],
       customNotes: '',
       photoPreview: undefined
     }
   ]);
+
+  // Sync external preselection from Catalog or Calculator
+  useEffect(() => {
+    if (initialServices && initialServices.length > 0) {
+      setShoesList(prev => prev.map((sh, idx) => {
+        if (idx === 0) {
+          return {
+            ...sh,
+            serviceIds: initialServices.map(s => s.id),
+            shoeType: initialShoeType || sh.shoeType,
+            severity: initialSeverity || sh.severity
+          };
+        }
+        return sh;
+      }));
+    }
+    if (initialPairsCount && initialPairsCount > 0) {
+      setPairsCount(initialPairsCount);
+    }
+    if (initialArea) {
+      setAreaName(initialArea);
+    }
+  }, [initialServices, initialShoeType, initialPairsCount, initialArea, initialSeverity]);
 
   // Delivery & Distance Zone State (Jarak: Dekat, Jauh Grab/Maxim, Luar Cirebon J&T Express)
   const [pickupType, setPickupType] = useState<'antar_jemput' | 'hanya_jemput' | 'drop_off'>('antar_jemput');
@@ -226,7 +252,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   const shoeDetailsWithPrices: ShoeItemDetail[] = shoesList.map((shoe, idx) => {
     const selectedServiceObjs = SERVICES_CATALOG.filter(s => shoe.serviceIds.includes(s.id));
     const pairPrice = selectedServiceObjs.reduce((sum, s) => {
-      return sum + calculateServicePrice(s.price, shoe.material, shoe.severity);
+      return sum + calculateServicePrice(s, shoe.material, shoe.severity);
     }, 0);
 
     return {
@@ -642,77 +668,168 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
               </div>
             </div>
 
-            {/* TINGKAT KEPARAHAN */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5 flex items-center justify-between">
-                <span>Tingkat Kerusakan #{activePairIndex + 1}:</span>
-                <span className="text-[11px] font-normal text-slate-400">Harga Menyesuaikan</span>
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {DAMAGE_SEVERITIES.map(sev => (
-                  <button
-                    key={sev.id}
-                    type="button"
-                    onClick={() => updateActiveShoe({ severity: sev.id })}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      activeShoe.severity === sev.id
-                        ? 'bg-slate-950 border-amber-400 ring-1 ring-amber-400/50'
-                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-xs font-bold text-white">{sev.label}</span>
-                      <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase border ${sev.colorClass}`}>
-                        {sev.badge}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 line-clamp-2 leading-tight">{sev.desc}</p>
-                  </button>
-                ))}
+            {/* TINGKAT KERUSAKAN & HARGA MASING-MASING */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold uppercase tracking-wider text-amber-400">
+                  Tingkat Kerusakan Sepatu #{activePairIndex + 1} (Sesuai Kondisi & Harga):
+                </label>
+                <span className="text-[11px] font-semibold text-slate-300">
+                  Klik tingkat kerusakan untuk menyesuaikan tarif
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {DAMAGE_SEVERITIES.map(sev => {
+                  const isSelected = activeShoe.severity === sev.id;
+                  const activeSelectedServices = SERVICES_CATALOG.filter(s => activeShoe.serviceIds.includes(s.id));
+                  const primaryServ = activeSelectedServices[0] || SERVICES_CATALOG[0];
+                  const tierDetail = getServiceTierDetail(primaryServ, sev.id);
+                  const totalForThisSeverity = activeSelectedServices.reduce(
+                    (sum, s) => sum + calculateServicePrice(s, activeShoe.material, sev.id),
+                    0
+                  );
+
+                  return (
+                    <button
+                      key={sev.id}
+                      type="button"
+                      onClick={() => updateActiveShoe({ severity: sev.id })}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        isSelected
+                          ? sev.activeBorderClass
+                          : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${sev.dotColor}`} />
+                            <span className="text-xs font-extrabold text-white">{sev.shortLabel}</span>
+                          </div>
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase border ${sev.colorClass}`}>
+                            {sev.badge}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-amber-300/95 truncate mt-1">
+                          {tierDetail.label.replace(/^(Ringan|Sedang|Berat)\s*\/\s*/i, '')}
+                        </div>
+                        <p className="text-[10px] text-slate-400 line-clamp-2 leading-snug mt-0.5">
+                          {tierDetail.damageDesc}
+                        </p>
+                      </div>
+
+                      <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">
+                          {activeSelectedServices.length} Layanan:
+                        </span>
+                        <span className={`text-xs font-black font-mono ${isSelected ? 'text-amber-400' : 'text-slate-200'}`}>
+                          Rp {totalForThisSeverity.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* PILIHAN LAYANAN REPARASI (Termasuk Jahit Benang Tak Kelihatan, Silang, Zigzag & Ganti Tapak) */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
+            {/* PILIHAN LAYANAN REPARASI DENGAN RINCIAN HARGA PER TINGKAT KERUSAKAN */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                  Pilih Layanan Reparasi #{activePairIndex + 1}:
+                  Pilih Layanan & Kerusakan Sepatu #{activePairIndex + 1}:
                 </label>
                 <span className="text-[11px] text-amber-400 font-semibold">Bisa pilih lebih dari 1 layanan</span>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1">
                 {SERVICES_CATALOG.map(serv => {
                   const isChecked = activeShoe.serviceIds.includes(serv.id);
-                  const adjustedPrice = calculateServicePrice(serv.price, activeShoe.material, activeShoe.severity);
+                  const activeTier = getServiceTierDetail(serv, activeShoe.severity);
+                  const tierKecil = getServiceTierDetail(serv, 'kecil');
+                  const tierNormal = getServiceTierDetail(serv, 'normal');
+                  const tierHard = getServiceTierDetail(serv, 'hard');
 
                   return (
                     <div
                       key={serv.id}
                       onClick={() => toggleServiceForActiveShoe(serv.id)}
-                      className={`p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
+                      className={`p-3 rounded-2xl border text-xs cursor-pointer flex flex-col justify-between gap-2 transition-all ${
                         isChecked
-                          ? 'bg-amber-500/15 border-amber-500 text-white font-semibold'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          ? 'bg-amber-500/15 border-amber-500 text-white shadow-md'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
                       }`}
                     >
-                      <div className="truncate pr-2">
-                        <div className="flex items-center gap-1">
-                          <span className="block truncate font-bold">{serv.name}</span>
-                          {serv.isBestMenu && (
-                            <span className="text-[9px] bg-amber-500 text-slate-950 px-1 rounded font-black shrink-0">
-                              Terbaik
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="font-bold text-white leading-snug">{serv.name}</span>
+                              {serv.isBestMenu && (
+                                <span className="text-[9px] bg-amber-500 text-slate-950 px-1.5 py-0.2 rounded font-black shrink-0">
+                                  Terbaik
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-amber-300 font-semibold block mt-0.5">
+                              • {activeTier.label}
                             </span>
-                          )}
+                          </div>
+                          <span className="text-amber-400 font-black shrink-0 font-mono text-xs">
+                            {activeTier.priceFormatted}
+                          </span>
                         </div>
-                        <span className="text-[10px] text-slate-500 block truncate">{serv.damageTitle}</span>
+                        <p className="text-[10px] text-slate-400 line-clamp-2 leading-snug mt-1">
+                          {activeTier.damageDesc}
+                        </p>
                       </div>
-                      <span className="text-amber-400 font-bold shrink-0 font-mono">
-                        Rp {adjustedPrice.toLocaleString('id-ID')}
-                      </span>
+
+                      {/* Mini 3-tier price bar */}
+                      <div className="pt-1.5 border-t border-slate-800/80 grid grid-cols-3 gap-1 text-[9px] font-mono text-center">
+                        <span className={`py-0.5 rounded px-1 ${activeShoe.severity === 'kecil' ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30' : 'bg-slate-900/70 text-slate-500'}`}>
+                          Ringan: {tierKecil.price / 1000}rb
+                        </span>
+                        <span className={`py-0.5 rounded px-1 ${activeShoe.severity === 'normal' ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30' : 'bg-slate-900/70 text-slate-500'}`}>
+                          Sedang: {tierNormal.price / 1000}rb
+                        </span>
+                        <span className={`py-0.5 rounded px-1 ${activeShoe.severity === 'hard' ? 'bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30' : 'bg-slate-900/70 text-slate-500'}`}>
+                          Berat: {tierHard.price / 1000}rb
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Tabel Rincian Kerusakan & Harga Terpilih untuk Sepatu Ini */}
+              <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 border-b border-slate-800 pb-1.5">
+                  <span>Rincian Kerusakan & Harga Sepatu #{activePairIndex + 1}:</span>
+                  <span className="text-amber-400 font-mono">
+                    Subtotal: Rp {(shoeDetailsWithPrices[activePairIndex]?.price || 0).toLocaleString('id-ID')}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {SERVICES_CATALOG.filter(s => activeShoe.serviceIds.includes(s.id)).map(srv => {
+                    const tier = getServiceTierDetail(srv, activeShoe.severity);
+                    return (
+                      <div key={srv.id} className="flex items-start justify-between gap-3 text-xs py-1 border-b border-slate-900 last:border-none">
+                        <div className="min-w-0">
+                          <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
+                            <span>✓ {srv.name}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-900 border border-slate-700 text-amber-300">
+                              {tier.label}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{tier.damageDesc}</p>
+                        </div>
+                        <span className="font-mono font-bold text-amber-400 shrink-0">
+                          {tier.priceFormatted}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -1215,30 +1332,41 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             )}
 
             {/* List per item */}
-            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-              {shoeDetailsWithPrices.map((sh, idx) => (
-                <div key={sh.id} className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1 text-xs">
-                  <div className="flex items-center justify-between font-bold">
-                    <span className="text-white">#{idx + 1} {sh.shoeBrand || 'Belum diisi'}</span>
-                    <span className="text-amber-400 font-mono">Rp {sh.price.toLocaleString('id-ID')}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-400">
-                    <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800">{sh.shoeType}</span>
-                    <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-amber-300">{sh.material}</span>
-                    <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-sky-300">
-                      Tingkat: {sh.severity.toUpperCase()}
-                    </span>
-                    {sh.photoUrl && (
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">
-                        📷 Foto Ada
+            <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+              {shoeDetailsWithPrices.map((sh, idx) => {
+                const sevMeta = DAMAGE_SEVERITIES.find(s => s.id === sh.severity) || DAMAGE_SEVERITIES[1];
+                return (
+                  <div key={sh.id} className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="text-white">#{idx + 1} {sh.shoeBrand || 'Belum diisi'}</span>
+                      <span className="text-amber-400 font-mono">Rp {sh.price.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-400">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800">{sh.shoeType}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-amber-300">{sh.material}</span>
+                      <span className={`px-1.5 py-0.5 rounded border font-bold ${sevMeta.colorClass}`}>
+                        Tingkat {sevMeta.shortLabel}
                       </span>
-                    )}
+                      {sh.photoUrl && (
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold">
+                          📷 Foto Ada
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-1 pt-1 border-t border-slate-900">
+                      {sh.selectedServices.map(s => {
+                        const t = getServiceTierDetail(s, sh.severity);
+                        return (
+                          <div key={s.id} className="flex items-center justify-between text-[11px] text-slate-300">
+                            <span className="truncate pr-2">• {s.name} ({t.badge})</span>
+                            <span className="font-mono text-amber-300 shrink-0">{t.priceFormatted}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 line-clamp-1">
-                    Layanan: {sh.selectedServices.map(s => s.name).join(', ')}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Live Ongkir & Calculation */}

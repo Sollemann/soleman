@@ -12,11 +12,10 @@ import {
   Clock, 
   Truck, 
   Sparkles, 
-  HelpCircle,
   RotateCcw
 } from 'lucide-react';
-import { ShoeType, ServiceItem } from '../types';
-import { SERVICES_CATALOG, CIREBON_AREAS } from '../data/solcreftData';
+import { ShoeType, ServiceItem, DamageSeverity } from '../types';
+import { SERVICES_CATALOG, CIREBON_AREAS, DAMAGE_SEVERITIES, getServiceTierDetail } from '../data/solcreftData';
 import { soundFx } from '../services/soundEffects';
 
 interface RepairCostCalculatorProps {
@@ -25,33 +24,31 @@ interface RepairCostCalculatorProps {
     shoeType: ShoeType;
     pairsCount: number;
     areaName: string;
+    severity: DamageSeverity;
   }) => void;
 }
 
 export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onApplyEstimate }) => {
   const [shoeType, setShoeType] = useState<ShoeType>('Sneakers');
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(['reglue-total-press']);
+  const [severity, setSeverity] = useState<DamageSeverity>('normal');
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(['jahit-benang-tersembunyi']);
   const [pairsCount, setPairsCount] = useState<number>(1);
   const [selectedAreaName, setSelectedAreaName] = useState<string>('Kesambi (Cipto, Sudarsono, Sunyaragi, Drajat)');
 
   const shoeTypeOptions: { type: ShoeType; label: string; icon: string }[] = [
     { type: 'Sneakers', label: 'Sneakers / Canvas', icon: '👟' },
+    { type: 'Sepatu Sekolah', label: 'Sepatu Sekolah', icon: '🎒' },
     { type: 'Sepatu Kantor / Pantofel', label: 'Kulit / Pantofel', icon: '👞' },
-    { type: 'Sepatu Gunung / Hiking', label: 'Gunung / Hiking', icon: '🥾' },
     { type: 'Sepatu Futsal', label: 'Sepatu Futsal', icon: '⚽' },
-    { type: 'Boots / Safety', label: 'Boots / Safety', icon: '🥾' },
-    { type: 'Heels / Flat Shoes', label: 'Flat Shoes / Casual', icon: '👡' }
+    { type: 'Sepatu Gunung / Hiking', label: 'Gunung / Hiking', icon: '⛰️' },
+    { type: 'Sepatu Trail', label: 'Sepatu Trail', icon: '🏔️' }
   ];
-
-  const popularServices = useMemo(() => {
-    return SERVICES_CATALOG.slice(0, 8);
-  }, []);
 
   const handleToggleService = (id: string) => {
     soundFx.playClick();
     setSelectedServiceIds(prev => {
       if (prev.includes(id)) {
-        if (prev.length === 1) return prev; // Keep at least one
+        if (prev.length === 1) return prev;
         return prev.filter(item => item !== id);
       } else {
         return [...prev, id];
@@ -60,19 +57,31 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
   };
 
   const selectedServices = useMemo(() => {
-    return SERVICES_CATALOG.filter(s => selectedServiceIds.includes(s.id));
+    const found = SERVICES_CATALOG.filter(s => selectedServiceIds.includes(s.id));
+    return found.length > 0 ? found : [SERVICES_CATALOG[0]];
   }, [selectedServiceIds]);
 
   const selectedAreaObj = useMemo(() => {
     return CIREBON_AREAS.find(a => a.name === selectedAreaName) || CIREBON_AREAS[0];
   }, [selectedAreaName]);
 
-  // Calculations
+  // Calculate price for each severity level so user can compare Ringan vs Sedang vs Berat side-by-side
+  const tierTotals = useMemo(() => {
+    const computeForSeverity = (sev: DamageSeverity) => {
+      return selectedServices.reduce((sum, srv) => sum + getServiceTierDetail(srv, sev).price, 0);
+    };
+    return {
+      kecil: computeForSeverity('kecil'),
+      normal: computeForSeverity('normal'),
+      hard: computeForSeverity('hard')
+    };
+  }, [selectedServices]);
+
+  // Detailed Calculation
   const calculation = useMemo(() => {
-    const baseServicePrice = selectedServices.reduce((sum, item) => sum + item.price, 0);
+    const baseServicePrice = tierTotals[severity];
     const subtotalServices = baseServicePrice * pairsCount;
 
-    // Free delivery rule: Kota = 0, Kabupaten = free if pairs >= 2
     let deliveryFee = 0;
     let isFreeDelivery = false;
     let deliveryNote = '';
@@ -95,13 +104,13 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
 
     const totalEstimate = subtotalServices + deliveryFee;
 
-    // Longest duration
-    let maxDays = 2;
-    if (selectedServices.some(s => s.category === 'sol' || s.id.includes('resoling'))) {
-      maxDays = 3;
+    let maxDays = severity === 'hard' ? 3 : 2;
+    if (selectedServices.some(s => s.category === 'sol' && s.id.startsWith('ganti-tapak'))) {
+      maxDays = severity === 'hard' ? 4 : 3;
+    } else if (selectedServices.every(s => s.category === 'jahit' || s.category === 'kebersihan') && severity !== 'hard') {
+      maxDays = 1;
     }
 
-    // Warranty: 60-90 days for reglue/resoling, 30 days for others
     let warrantyDays = 30;
     if (selectedServices.some(s => s.warrantyDays && s.warrantyDays > 30)) {
       warrantyDays = Math.max(...selectedServices.map(s => s.warrantyDays || 30));
@@ -117,7 +126,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
       maxDays,
       warrantyDays
     };
-  }, [selectedServices, pairsCount, selectedAreaObj]);
+  }, [selectedServices, severity, tierTotals, pairsCount, selectedAreaObj]);
 
   const handleApply = () => {
     soundFx.playSuccess();
@@ -125,17 +134,21 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
       services: selectedServices,
       shoeType,
       pairsCount,
-      areaName: selectedAreaName
+      areaName: selectedAreaName,
+      severity
     });
   };
 
   const handleReset = () => {
     soundFx.playClick();
-    setSelectedServiceIds(['reglue-total-press']);
+    setSelectedServiceIds(['jahit-benang-tersembunyi']);
+    setSeverity('normal');
     setPairsCount(1);
     setShoeType('Sneakers');
     setSelectedAreaName(CIREBON_AREAS[0].name);
   };
+
+  const activeSeverityMeta = DAMAGE_SEVERITIES.find(s => s.id === severity) || DAMAGE_SEVERITIES[1];
 
   return (
     <section id="kalkulator" className="py-16 lg:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-800">
@@ -144,14 +157,14 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
       <div className="text-center max-w-3xl mx-auto space-y-3">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider">
           <Calculator className="w-3.5 h-3.5" />
-          <span>Transparan & Akurat</span>
+          <span>Transparan & Sesuai Tingkat Kerusakan</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-display">
-          Kalkulator Estimasi Biaya & Waktu <br />
+          Kalkulator Estimasi Biaya & Tingkat Kerusakan <br />
           <span className="text-amber-400">Reparasi Sepatu di Cirebon</span>
         </h2>
         <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-          Hitung estimasi pengeluaran secara instan sebelum memesan. Tidak ada biaya siluman; harga transparan dan bergaransi resmi.
+          Pilih jenis kerusakan dan tingkat keparahannya (<strong className="text-white">Ringan, Sedang, atau Berat</strong>) untuk melihat rincian harga masing-masing secara rapi sebelum memesan.
         </p>
       </div>
 
@@ -163,10 +176,10 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
           {/* Step 1: Jenis Sepatu */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                <span>1. Jenis Sepatu Anda:</span>
+              <label className="text-xs font-black uppercase tracking-wider text-amber-400">
+                1. Jenis Sepatu Anda:
               </label>
-              <span className="text-[11px] text-slate-400">{shoeType}</span>
+              <span className="text-[11px] text-slate-400 font-semibold">{shoeType}</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -194,20 +207,83 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
             </div>
           </div>
 
-          {/* Step 2: Pilih Kerusakan / Layanan */}
+          {/* Step 2: Pilih Tingkat Kerusakan */}
           <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black uppercase tracking-wider text-amber-400">
-                2. Kerusakan & Servis yang Dibutuhkan:
+                2. Pilih Tingkat Kerusakan (Harga Menyesuaikan):
+              </label>
+              <span className="text-[11px] text-amber-300 font-bold">
+                Aktif: {activeSeverityMeta.shortLabel}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {DAMAGE_SEVERITIES.map(sev => {
+                const isSelected = severity === sev.id;
+                const tierSum = tierTotals[sev.id];
+                const sampleTier = getServiceTierDetail(selectedServices[0], sev.id);
+
+                return (
+                  <button
+                    key={sev.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setSeverity(sev.id);
+                    }}
+                    className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? sev.activeBorderClass
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2.5 h-2.5 rounded-full ${sev.dotColor}`} />
+                          <span className="text-xs font-extrabold text-white">{sev.shortLabel}</span>
+                        </div>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase border ${sev.colorClass}`}>
+                          {sev.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 font-semibold line-clamp-1 mt-1">
+                        {sampleTier.label.replace(/^(Ringan|Sedang|Berat)\s*\/\s*/i, '')}
+                      </p>
+                      <p className="text-[10px] text-slate-400 line-clamp-2 leading-snug mt-0.5">
+                        {sampleTier.damageDesc}
+                      </p>
+                    </div>
+
+                    <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400">Tarif / Pasang:</span>
+                      <span className={`text-xs font-black font-mono ${isSelected ? 'text-amber-400' : 'text-slate-200'}`}>
+                        Rp {tierSum.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Step 3: Pilih Kerusakan / Layanan */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black uppercase tracking-wider text-amber-400">
+                3. Pilih Jenis Kerusakan & Layanan Reparasi:
               </label>
               <span className="text-[11px] text-amber-300 font-semibold">
                 {selectedServiceIds.length} Layanan Dipilih
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
-              {popularServices.map(srv => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1">
+              {SERVICES_CATALOG.map(srv => {
                 const isChecked = selectedServiceIds.includes(srv.id);
+                const tierInfo = getServiceTierDetail(srv, severity);
+
                 return (
                   <button
                     key={srv.id}
@@ -215,7 +291,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
                     onClick={() => handleToggleService(srv.id)}
                     className={`p-3 rounded-2xl text-left border transition-all flex items-start gap-2.5 cursor-pointer ${
                       isChecked
-                        ? 'bg-amber-500/20 border-amber-400 text-white shadow-md'
+                        ? 'bg-amber-500/15 border-amber-400 text-white shadow-md'
                         : 'bg-slate-950 border-slate-800/90 text-slate-400 hover:border-slate-700'
                     }`}
                   >
@@ -225,9 +301,17 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
                       {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold leading-tight text-white line-clamp-1">{srv.name}</div>
-                      <div className="text-[11px] text-amber-400/90 font-mono font-semibold mt-0.5">
-                        Rp {srv.price.toLocaleString('id-ID')}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold leading-tight text-white truncate">{srv.name}</span>
+                        <span className="text-xs text-amber-400 font-mono font-black shrink-0">
+                          {tierInfo.priceFormatted}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-amber-300/90 font-semibold mt-0.5 truncate">
+                        • {tierInfo.label}
+                      </div>
+                      <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                        {tierInfo.damageDesc}
                       </div>
                     </div>
                   </button>
@@ -236,13 +320,13 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
             </div>
           </div>
 
-          {/* Step 3: Jumlah Pasang & Lokasi Kecamatan Cirebon */}
+          {/* Step 4: Jumlah Pasang & Lokasi Kecamatan Cirebon */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             
             {/* Jumlah Pasang */}
             <div className="space-y-2">
               <label className="text-xs font-black uppercase tracking-wider text-amber-400">
-                3. Jumlah Sepatu:
+                4. Jumlah Sepatu:
               </label>
               <div className="flex items-center gap-2">
                 {[1, 2, 3, 4].map(num => (
@@ -268,7 +352,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
             {/* Wilayah Kecamatan */}
             <div className="space-y-2">
               <label className="text-xs font-black uppercase tracking-wider text-amber-400">
-                4. Wilayah Anda di Cirebon:
+                5. Wilayah Anda di Cirebon:
               </label>
               <select
                 value={selectedAreaName}
@@ -289,7 +373,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
           </div>
 
           <div className="pt-2 flex items-center justify-between text-xs text-slate-400">
-            <span>Estimasi ini dihitung berdasarkan standar teknisi Soleman Cirebon.</span>
+            <span>Harga dijamin sesuai tingkat kerusakan masing-masing layanan.</span>
             <button
               type="button"
               onClick={handleReset}
@@ -303,37 +387,64 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
         </div>
 
         {/* Right Output Summary Card (5 cols) */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/40 border border-amber-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
+        <div className="lg:col-span-5 bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/40 border border-amber-500/30 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl relative overflow-hidden">
           
-          <div className="space-y-2 border-b border-slate-800 pb-4">
-            <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
-              Hasil Kalkulasi Instan
-            </span>
-            <h3 className="text-xl font-bold text-white">Ringkasan Estimasi Biaya</h3>
+          <div className="space-y-1.5 border-b border-slate-800 pb-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                Rincian Estimasi Resmi
+              </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border ${activeSeverityMeta.colorClass}`}>
+                Tingkat {activeSeverityMeta.shortLabel}
+              </span>
+            </div>
+            <h3 className="text-xl font-bold text-white">Ringkasan Kerusakan & Biaya</h3>
             <p className="text-xs text-slate-400">
-              Untuk {pairsCount} pasang sepatu {shoeType} di wilayah {selectedAreaObj.type} Cirebon.
+              Untuk {pairsCount} pasang {shoeType} • Wilayah {selectedAreaObj.type} Cirebon
             </p>
           </div>
 
-          {/* Selected Breakdown List */}
-          <div className="space-y-2 text-xs">
-            <div className="text-slate-400 font-semibold mb-1">Rincian Layanan ({selectedServices.length}):</div>
-            {selectedServices.map(srv => (
-              <div key={srv.id} className="flex items-center justify-between py-1 border-b border-slate-800/60">
-                <span className="text-slate-300 truncate max-w-[200px]">{srv.name}</span>
-                <span className="text-slate-200 font-mono font-medium">Rp {srv.price.toLocaleString('id-ID')}</span>
-              </div>
-            ))}
+          {/* Selected Breakdown List with Specific Damage & Price */}
+          <div className="space-y-2.5 text-xs">
+            <div className="text-slate-300 font-bold">
+              Rincian Masing-Masing Kerusakan ({selectedServices.length} Layanan):
+            </div>
+            <div className="space-y-2">
+              {selectedServices.map(srv => {
+                const tier = getServiceTierDetail(srv, severity);
+                return (
+                  <div key={srv.id} className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-bold text-white leading-snug">{srv.name}</span>
+                      <span className="text-amber-400 font-mono font-black shrink-0">
+                        {tier.priceFormatted}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px]">
+                      <span className={`px-1.5 py-0.2 rounded font-bold uppercase border ${activeSeverityMeta.colorClass}`}>
+                        {tier.label}
+                      </span>
+                      <span className="text-slate-400">• Est. {tier.durationEst}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-snug">
+                      {tier.damageDesc}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
 
             {pairsCount > 1 && (
-              <div className="flex items-center justify-between py-1 text-slate-400">
-                <span>Pengali Pasang:</span>
-                <span className="font-bold text-white">× {pairsCount} Pasang</span>
+              <div className="flex items-center justify-between py-1.5 px-1 text-slate-300 border-t border-slate-800/80">
+                <span>Subtotal {pairsCount} Pasang Sepatu:</span>
+                <span className="font-bold font-mono text-white">
+                  Rp {calculation.subtotalServices.toLocaleString('id-ID')}
+                </span>
               </div>
             )}
 
-            <div className="flex items-center justify-between py-1 text-xs">
-              <span className="text-slate-400 flex items-center gap-1">
+            <div className="flex items-center justify-between py-1.5 px-1 text-xs border-t border-slate-800/80">
+              <span className="text-slate-400 flex items-center gap-1.5">
                 <Truck className="w-3.5 h-3.5 text-sky-400" />
                 <span>Ongkos Kirim Kurir:</span>
               </span>
@@ -342,7 +453,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
               </span>
             </div>
 
-            <div className="text-[10px] text-slate-400 italic">
+            <div className="text-[10px] text-slate-400 italic px-1">
               * {calculation.deliveryNote}
             </div>
           </div>
@@ -350,13 +461,13 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
           {/* Big Total Price */}
           <div className="p-4 rounded-2xl bg-slate-950 border border-amber-500/30 text-center space-y-1">
             <span className="text-[11px] text-slate-400 uppercase tracking-wider font-bold">
-              Total Estimasi Biaya
+              Total Estimasi Biaya ({activeSeverityMeta.shortLabel})
             </span>
             <div className="text-3xl font-black text-amber-400 font-mono tracking-tight">
               Rp {calculation.totalEstimate.toLocaleString('id-ID')}
             </div>
             <span className="text-[10px] text-slate-400 block">
-              Bisa Bayar COD (Saat Sepatu Jadi) atau QRIS DANA
+              Bisa Bayar COD (Saat Sepatu Selesai) atau QRIS / DANA
             </span>
           </div>
 
