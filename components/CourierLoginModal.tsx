@@ -161,7 +161,7 @@ export const CourierLoginModal: React.FC<CourierLoginModalProps> = ({
         </form>
 
         <div className="text-center pt-2 border-t border-slate-800 text-[11px] text-slate-500">
-          <p>Soleman Workshop & Shoes Repair Cirebon</p>
+          <p>Soleman Cirebon</p>
         </div>
 
       </div>
