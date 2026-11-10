@@ -30,29 +30,24 @@ import { Order, OrderStatus, ServiceItem, ShoeType, DamageSeverity, AdminUser, C
 import { adminAuthService } from './services/adminAuthService';
 import { courierAuthService } from './services/courierAuthService';
 import { customerAuthService } from './services/customerAuthService';
-import { MessageSquare, Phone, Truck, Lock, ShieldCheck, CheckCircle2, Bot, LogOut, Wrench, Search, MapPin, WifiOff } from 'lucide-react';
+import { MessageSquare, Phone, Truck, Lock, ShieldCheck, CheckCircle2, Bot, LogOut, Wrench, Search, MapPin, WifiOff, AlertTriangle, RefreshCw } from 'lucide-react';
 import { soundFx } from './services/soundEffects';
 import {
   subscribeToOrdersRealtime,
   saveOrderToFirestore,
   deleteOrderFromFirestore,
+  purgeLegacyLocalStorage,
+  FirestoreSyncState,
+  ORDERS_COLLECTION,
 } from './services/firebaseOrderService';
-
-const STORAGE_KEY = 'solcreft_orders_cirebon_v1';
+import { FIRESTORE_DATABASE_ID } from './firebase';
 
 export const App: React.FC = () => {
-  // Orders State (disinkronkan secara real-time dari Firebase Firestore ke semua HP Kurir, Admin & Pelanggan)
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn('Failed to load initial cached orders', e);
-    }
-    return INITIAL_ORDERS;
-  });
+  // Orders State: 100% Real-Time dari Firebase Firestore (default) koleksi 'oderan' (Tanpa localStorage & Tanpa Data Contoh)
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [firestoreSyncState, setFirestoreSyncState] = useState<FirestoreSyncState>('connecting');
+  const [firebaseError, setFirebaseError] = useState<string | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState<number>(0);
 
   // Admin Authentication State
   const [adminUser, setAdminUser] = useState<AdminUser | null>(() => {
@@ -95,11 +90,20 @@ export const App: React.FC = () => {
   // Count pending unaccepted orders
   const pendingOrdersCount = orders.filter(o => !o.isAcceptedByAdmin).length;
 
-  // Real-time Firebase Firestore synchronization (onSnapshot) across all devices + URL ?kurir_order= capture
+  // Real-time Firebase Firestore (default) synchronization pada koleksi 'oderan'
   useEffect(() => {
-    const unsubscribeFirestore = subscribeToOrdersRealtime((liveOrders) => {
-      setOrders(liveOrders);
-    });
+    purgeLegacyLocalStorage();
+    const unsubscribeFirestore = subscribeToOrdersRealtime(
+      (liveOrders) => {
+        setOrders(liveOrders);
+      },
+      (syncState) => {
+        setFirestoreSyncState(syncState);
+      },
+      (errMsg) => {
+        setFirebaseError(errMsg);
+      }
+    );
 
     // Check URL parameter ?kurir_order= from WhatsApp link
     try {
@@ -114,7 +118,7 @@ export const App: React.FC = () => {
               const mergedOrder = existing
                 ? { ...decodedOrder, isAcceptedByAdmin: existing.isAcceptedByAdmin, status: existing.status }
                 : decodedOrder;
-              void saveOrderToFirestore(mergedOrder, !existing);
+              void saveOrderToFirestore(mergedOrder, !existing, setFirebaseError);
               if (existing) {
                 return prev.map((o) => (o.id === decodedOrder.id ? mergedOrder : o));
               }
@@ -136,9 +140,9 @@ export const App: React.FC = () => {
     return () => {
       unsubscribeFirestore();
     };
-  }, []);
+  }, [retryTrigger]);
 
-  // Handle adding new order (or updating if ID already exists) & sync immediately to Firebase Firestore
+  // Handle adding new order & simpan langsung ke koleksi 'oderan' di Firebase Firestore (default)
   const handleOrderCreated = (newOrder: Order) => {
     const orderWithCustomer = customerUser && !newOrder.customerId
       ? { ...newOrder, customerId: customerUser.id }
@@ -152,10 +156,10 @@ export const App: React.FC = () => {
       }
       return [orderWithCustomer, ...prev];
     });
-    void saveOrderToFirestore(orderWithCustomer, true);
+    void saveOrderToFirestore(orderWithCustomer, true, setFirebaseError);
   };
 
-  // Handle accepting order by Admin or Courier Soleman & sync immediately to Firebase Firestore
+  // Handle accepting order by Admin or Courier Soleman & sync immediately to Firebase Firestore (default)
   const handleAcceptOrder = (orderId: string, courierName: string = 'Kurir Soleman', courierPhone: string = '08814519955') => {
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
     setOrders(prev => prev.map(order => {
@@ -177,12 +181,12 @@ export const App: React.FC = () => {
         status: 'perjalanan_workshop' as OrderStatus,
         timeline: [acceptTimeline, ...order.timeline]
       };
-      void saveOrderToFirestore(updatedOrder, false);
+      void saveOrderToFirestore(updatedOrder, false, setFirebaseError);
       return updatedOrder;
     }));
   };
 
-  // Handle updating full order details (e.g. physical shoe inspection by Courier Soleman) & sync to Firebase Firestore
+  // Handle updating full order details (e.g. physical shoe inspection by Courier Soleman) & sync to Firebase Firestore (default)
   const handleUpdateOrderDetails = (orderId: string, updatedFields: Partial<Order>, logNote?: string) => {
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
     setOrders(prev => prev.map(order => {
@@ -203,18 +207,18 @@ export const App: React.FC = () => {
         ...updatedFields,
         timeline: nextTimeline,
       };
-      void saveOrderToFirestore(updatedOrder, false);
+      void saveOrderToFirestore(updatedOrder, false, setFirebaseError);
       return updatedOrder;
     }));
   };
 
-  // Handle deleting/removing order from portal & Firebase Firestore
+  // Handle deleting/removing order from portal & Firebase Firestore (default)
   const handleDeleteOrder = (orderId: string) => {
     setOrders(prev => prev.filter(o => o.id !== orderId));
-    void deleteOrderFromFirestore(orderId);
+    void deleteOrderFromFirestore(orderId, setFirebaseError);
   };
 
-  // Handle rejecting order by Admin & sync to Firebase Firestore
+  // Handle rejecting order by Admin & sync to Firebase Firestore (default)
   const handleRejectOrder = (orderId: string, reason: string) => {
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
     setOrders(prev => prev.map(order => {
@@ -233,12 +237,12 @@ export const App: React.FC = () => {
         customNotes: (order.customNotes ? order.customNotes + ' • ' : '') + `[Admin: ${reason}]`,
         timeline: [rejectTimeline, ...order.timeline]
       };
-      void saveOrderToFirestore(updatedOrder, false);
+      void saveOrderToFirestore(updatedOrder, false, setFirebaseError);
       return updatedOrder;
     }));
   };
 
-  // Handle updating order status (jemput, workshop, siap antar, selesai) & sync immediately to Firebase Firestore
+  // Handle updating order status (jemput, workshop, siap antar, selesai) & sync immediately to Firebase Firestore (default)
   const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus, customNote?: string) => {
     setOrders(prev => prev.map(order => {
       if (order.id !== orderId) return order;
@@ -256,12 +260,12 @@ export const App: React.FC = () => {
         status: newStatus,
         timeline: [newTimelineItem, ...order.timeline]
       };
-      void saveOrderToFirestore(updatedOrder, false);
+      void saveOrderToFirestore(updatedOrder, false, setFirebaseError);
       return updatedOrder;
     }));
   };
 
-  // Handle updating payment status (from Courier or Admin) & sync to Firebase Firestore
+  // Handle updating payment status (from Courier or Admin) & sync to Firebase Firestore (default)
   const handleUpdatePaymentStatus = (orderId: string, paymentStatus: PaymentStatus) => {
     setOrders(prev => prev.map(order => {
       if (order.id !== orderId) return order;
@@ -269,12 +273,12 @@ export const App: React.FC = () => {
         ...order,
         paymentStatus
       };
-      void saveOrderToFirestore(updatedOrder, false);
+      void saveOrderToFirestore(updatedOrder, false, setFirebaseError);
       return updatedOrder;
     }));
   };
 
-  // Handle updating customer Sherlock & Patokan location on Courier Dashboard & sync to Firebase Firestore
+  // Handle updating customer Sherlock & Patokan location on Courier Dashboard & sync to Firebase Firestore (default)
   const handleUpdateOrderLocation = (
     orderId: string,
     locUpdate: {
@@ -306,9 +310,52 @@ export const App: React.FC = () => {
         },
         timeline: [locTimeline, ...order.timeline]
       };
-      void saveOrderToFirestore(updatedOrder, false);
+      void saveOrderToFirestore(updatedOrder, false, setFirebaseError);
       return updatedOrder;
     }));
+  };
+
+  // Komponen Pesan Error Merah di Layar jika Koneksi / Penyimpanan ke Firebase Firestore Gagal
+  const renderFirebaseErrorBanner = () => {
+    if (!firebaseError) return null;
+    return (
+      <div className="bg-red-950/95 border-b-2 border-red-500 text-red-100 px-4 py-3.5 shadow-2xl z-50">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-red-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-lg">
+              <AlertTriangle className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-black uppercase tracking-wider bg-red-500 text-white px-2 py-0.5 rounded">
+                  ERROR KONEKSI FIREBASE FIRESTORE
+                </span>
+                <span className="text-[11px] font-mono text-red-300">
+                  Database: {FIRESTORE_DATABASE_ID} • Koleksi: {ORDERS_COLLECTION}
+                </span>
+              </div>
+              <p className="text-xs font-bold text-white leading-relaxed">
+                {firebaseError}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setFirebaseError(null);
+                setRetryTrigger((prev) => prev + 1);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-white font-black text-xs shadow-md cursor-pointer transition-all"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Coba Hubungkan Ulang</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const getStatusShortLabel = (status: OrderStatus): string => {
@@ -427,17 +474,30 @@ export const App: React.FC = () => {
   if (adminUser) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+        {renderFirebaseErrorBanner()}
         {/* Dedicated Admin Portal Header Bar */}
         <header className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-amber-500/30 px-4 py-3 shadow-xl">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <SolemanLogo size="sm" />
               <div className="border-l border-slate-700 pl-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full">
                     Portal Khusus Admin Workshop
                   </span>
-                  <span className="text-xs font-bold text-white hidden sm:inline">Soleman Cirebon</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    firestoreSyncState === 'connected'
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      : firestoreSyncState === 'error'
+                      ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                      : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                  }`}>
+                    {firestoreSyncState === 'connected'
+                      ? `🟢 Firestore Realtime • ${ORDERS_COLLECTION} Live`
+                      : firestoreSyncState === 'error'
+                      ? '🔴 Koneksi Firestore Gagal'
+                      : '⏳ Menghubungkan Firestore...'}
+                  </span>
                 </div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
                   Login: <strong className="text-amber-400">{adminUser.name}</strong> ({adminUser.email})
@@ -482,6 +542,7 @@ export const App: React.FC = () => {
     const incomingPickupCount = orders.filter(o => o.status === 'menunggu_jemput' || !o.isAcceptedByAdmin).length;
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+        {renderFirebaseErrorBanner()}
         {/* Dedicated Courier Portal Header Bar */}
         <header className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-amber-500/30 px-4 py-3 shadow-xl">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
@@ -491,6 +552,19 @@ export const App: React.FC = () => {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 px-2.5 py-0.5 rounded-full">
                     Portal Khusus Kurir Soleman
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    firestoreSyncState === 'connected'
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      : firestoreSyncState === 'error'
+                      ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                      : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                  }`}>
+                    {firestoreSyncState === 'connected'
+                      ? `🟢 Firestore Realtime • ${ORDERS_COLLECTION} Live`
+                      : firestoreSyncState === 'error'
+                      ? '🔴 Koneksi Firestore Gagal'
+                      : '⏳ Menghubungkan Firestore...'}
                   </span>
                   {incomingPickupCount > 0 && (
                     <span className="text-[10px] font-black bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-full animate-pulse">
@@ -541,7 +615,7 @@ export const App: React.FC = () => {
   // =========================================================================
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      
+      {renderFirebaseErrorBanner()}
       {/* Navbar Pelanggan: Bersih tanpa tombol Admin/Kurir (Akses staf hanya via klik logo Soleman) */}
       <Navbar
         activeTab={activeTab}
