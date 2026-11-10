@@ -6,7 +6,7 @@
 import { ServiceItem, CirebonArea, Order, ShoeMaterial, DamageSeverity, SeverityTierDetail } from '../types';
 
 export const WORKSHOP_INFO = {
-  name: 'Soleman Workshop & Shoes Repair',
+  name: 'Soleman',
   tagline: 'Perbaikan & Perawatan Sepatu Terlengkap di Cirebon',
   phone: '628814519955',
   phoneFormatted: '0881-4519-955',
