@@ -93,7 +93,6 @@ export const WorkshopLocationSection: React.FC = () => {
           <div className="space-y-6">
             <div>
               <span className="text-xs font-bold text-amber-400 uppercase tracking-widest">Alamat Workshop</span>
-              <h3 className="text-xl font-bold text-white mt-1">{WORKSHOP_INFO.name}</h3>
               <p className="text-xs text-slate-400 mt-1">{WORKSHOP_INFO.tagline}</p>
             </div>
 
