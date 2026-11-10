@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidOrderPayload(data) {
+      return data.keys().hasAll([
+        'id',
+        'customerName',
+        'customerPhone',
+        'shoeBrand',
+        'pairsCount',
+        'paymentMethod',
+        'paymentStatus',
+        'totalAmount',
+        'status'
+      ])
+      && data.id is string && data.id.size() >= 1 && data.id.size() <= 64
+      && data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 200
+      && data.customerPhone is string && data.customerPhone.size() >= 1 && data.customerPhone.size() <= 64
+      && data.shoeBrand is string && data.shoeBrand.size() >= 1 && data.shoeBrand.size() <= 300
+      && data.pairsCount is number && data.pairsCount >= 1 && data.pairsCount <= 100
+      && data.paymentMethod in ['qris', 'cod']
+      && data.paymentStatus in ['menunggu_pembayaran', 'lunas', 'cod_pending', 'cod_selesai']
+      && data.totalAmount is number && data.totalAmount >= 0 && data.totalAmount <= 100000000
+      && data.status in [
+        'menunggu_jemput',
+        'perjalanan_workshop',
+        'pengerjaan',
+        'quality_check',
+        'siap_antar',
+        'selesai'
+      ];
+    }
+
+    // Connection health check endpoint
+    match /test/{docId} {
+      allow get: if isValidId(docId);
+    }
+
+    // Real-time orders collection synchronized across Pelanggan, Kurir Soleman, and Admin Workshop
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId);
+      allow list: if resource.data.id is string && resource.data.id.size() <= 64;
+      allow create: if isValidId(orderId) && isValidOrderPayload(incoming());
+      allow update: if isValidId(orderId) && isValidOrderPayload(incoming());
+      allow delete: if isValidId(orderId);
+    }
+  }
+}

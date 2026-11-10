@@ -1,0 +1,116 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "Data pesanan reparasi dan antar-jemput sepatu Soleman Cirebon yang disinkronkan secara real-time antara Pelanggan, Kurir Soleman, dan Admin Workshop.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Kode unik pesanan (contoh: SLC-1024)",
+          "maxLength": 64
+        },
+        "customerName": {
+          "type": "string",
+          "description": "Nama lengkap pelanggan",
+          "maxLength": 200
+        },
+        "customerPhone": {
+          "type": "string",
+          "description": "Nomor WhatsApp pelanggan",
+          "maxLength": 64
+        },
+        "shoeBrand": {
+          "type": "string",
+          "description": "Merk atau ringkasan model sepatu",
+          "maxLength": 300
+        },
+        "shoeType": {
+          "type": "string",
+          "description": "Kategori jenis sepatu",
+          "maxLength": 100
+        },
+        "pairsCount": {
+          "type": "number",
+          "description": "Jumlah pasang sepatu yang diservis"
+        },
+        "pickupType": {
+          "type": "string",
+          "enum": ["antar_jemput", "hanya_jemput", "drop_off"],
+          "description": "Metode penjemputan/pengantaran"
+        },
+        "preferredTimeSlot": {
+          "type": "string",
+          "enum": ["pagi", "siang", "sore"],
+          "description": "Jadwal sesi penjemputan"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["qris", "cod"],
+          "description": "Metode pembayaran yang dipilih pelanggan"
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["menunggu_pembayaran", "lunas", "cod_pending", "cod_selesai"],
+          "description": "Status pembayaran pesanan"
+        },
+        "totalServicesPrice": {
+          "type": "number",
+          "description": "Total biaya layanan reparasi sepatu (IDR)"
+        },
+        "deliveryFee": {
+          "type": "number",
+          "description": "Biaya ongkos kirim kurir (IDR)"
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Total tagihan keseluruhan (IDR)"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "menunggu_jemput",
+            "perjalanan_workshop",
+            "pengerjaan",
+            "quality_check",
+            "siap_antar",
+            "selesai"
+          ],
+          "description": "Tahap progres pengerjaan dan pengantaran pesanan"
+        },
+        "isAcceptedByAdmin": {
+          "type": "boolean",
+          "description": "Status apakah pesanan sudah diterima oleh Kurir Soleman atau Admin"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Waktu pembuatan pesanan",
+          "maxLength": 120
+        },
+        "updatedAtMs": {
+          "type": "number",
+          "description": "Timestamp milidetik untuk pengurutan real-time"
+        }
+      },
+      "required": [
+        "id",
+        "customerName",
+        "customerPhone",
+        "shoeBrand",
+        "pairsCount",
+        "paymentMethod",
+        "paymentStatus",
+        "totalAmount",
+        "status"
+      ]
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "schema": {
+        "$ref": "#/entities/Order"
+      },
+      "description": "Koleksi utama pesanan reparasi sepatu Soleman Cirebon yang disinkronkan real-time ke semua perangkat."
+    }
+  }
+}

@@ -32,11 +32,16 @@ import { courierAuthService } from './services/courierAuthService';
 import { customerAuthService } from './services/customerAuthService';
 import { MessageSquare, Phone, Truck, Lock, ShieldCheck, CheckCircle2, Bot, LogOut, Wrench, Search, MapPin, WifiOff } from 'lucide-react';
 import { soundFx } from './services/soundEffects';
+import {
+  subscribeToOrdersRealtime,
+  saveOrderToFirestore,
+  deleteOrderFromFirestore,
+} from './services/firebaseOrderService';
 
 const STORAGE_KEY = 'solcreft_orders_cirebon_v1';
 
 export const App: React.FC = () => {
-  // Orders State (loaded from localStorage or initialized with realistic Cirebon sample orders)
+  // Orders State (disinkronkan secara real-time dari Firebase Firestore ke semua HP Kurir, Admin & Pelanggan)
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -44,7 +49,7 @@ export const App: React.FC = () => {
         return JSON.parse(saved);
       }
     } catch (e) {
-      console.warn('Failed to load orders from localStorage', e);
+      console.warn('Failed to load initial cached orders', e);
     }
     return INITIAL_ORDERS;
   });
@@ -90,45 +95,11 @@ export const App: React.FC = () => {
   // Count pending unaccepted orders
   const pendingOrdersCount = orders.filter(o => !o.isAcceptedByAdmin).length;
 
-  // Persist orders to localStorage & broadcast across tabs immediately
+  // Real-time Firebase Firestore synchronization (onSnapshot) across all devices + URL ?kurir_order= capture
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-      if (typeof BroadcastChannel !== 'undefined') {
-        const bc = new BroadcastChannel('solcreft_orders_channel');
-        bc.postMessage({ type: 'ORDERS_UPDATED', orders });
-        bc.close();
-      }
-    } catch (e) {
-      console.warn('Failed to save orders to localStorage', e);
-    }
-  }, [orders]);
-
-  // Real-time cross-tab synchronization + URL ?kurir_order= automatic capture
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
-        try {
-          const updated = JSON.parse(e.newValue);
-          if (Array.isArray(updated)) {
-            setOrders(updated);
-          }
-        } catch (err) {
-          console.warn('Failed to sync orders across tabs', err);
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-
-    let bc: BroadcastChannel | null = null;
-    if (typeof BroadcastChannel !== 'undefined') {
-      bc = new BroadcastChannel('solcreft_orders_channel');
-      bc.onmessage = (ev) => {
-        if (ev.data?.type === 'ORDERS_UPDATED' && Array.isArray(ev.data.orders)) {
-          setOrders(ev.data.orders);
-        }
-      };
-    }
+    const unsubscribeFirestore = subscribeToOrdersRealtime((liveOrders) => {
+      setOrders(liveOrders);
+    });
 
     // Check URL parameter ?kurir_order= from WhatsApp link
     try {
@@ -139,11 +110,15 @@ export const App: React.FC = () => {
           const decodedOrder = decodeOrderFromCourierLink(kurirToken, courierUser?.name || 'Kurir Soleman');
           if (decodedOrder) {
             setOrders((prev) => {
-              const exists = prev.some((o) => o.id === decodedOrder.id);
-              if (exists) {
-                return prev.map((o) => (o.id === decodedOrder.id ? { ...decodedOrder, isAcceptedByAdmin: o.isAcceptedByAdmin, status: o.status } : o));
+              const existing = prev.find((o) => o.id === decodedOrder.id);
+              const mergedOrder = existing
+                ? { ...decodedOrder, isAcceptedByAdmin: existing.isAcceptedByAdmin, status: existing.status }
+                : decodedOrder;
+              void saveOrderToFirestore(mergedOrder, !existing);
+              if (existing) {
+                return prev.map((o) => (o.id === decodedOrder.id ? mergedOrder : o));
               }
-              return [decodedOrder, ...prev];
+              return [mergedOrder, ...prev];
             });
             // Bersihkan parameter URL tanpa reload
             const cleanUrl = window.location.pathname + window.location.hash;
@@ -159,12 +134,11 @@ export const App: React.FC = () => {
     }
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      if (bc) bc.close();
+      unsubscribeFirestore();
     };
   }, []);
 
-  // Handle adding new order (or updating if ID already exists)
+  // Handle adding new order (or updating if ID already exists) & sync immediately to Firebase Firestore
   const handleOrderCreated = (newOrder: Order) => {
     const orderWithCustomer = customerUser && !newOrder.customerId
       ? { ...newOrder, customerId: customerUser.id }
@@ -178,9 +152,10 @@ export const App: React.FC = () => {
       }
       return [orderWithCustomer, ...prev];
     });
+    void saveOrderToFirestore(orderWithCustomer, true);
   };
 
-  // Handle accepting order by Admin or Courier Soleman
+  // Handle accepting order by Admin or Courier Soleman & sync immediately to Firebase Firestore
   const handleAcceptOrder = (orderId: string, courierName: string = 'Kurir Soleman', courierPhone: string = '08814519955') => {
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
     setOrders(prev => prev.map(order => {
@@ -193,7 +168,7 @@ export const App: React.FC = () => {
         description: `Pesanan diterima di Portal Kurir. ${courierName} sedang meluncur ke titik penjemputan (${order.location.landmark || order.location.areaName}).`
       };
 
-      return {
+      const updatedOrder: Order = {
         ...order,
         isAcceptedByAdmin: true,
         acceptedAt: timeStr + ' WIB',
@@ -202,10 +177,12 @@ export const App: React.FC = () => {
         status: 'perjalanan_workshop' as OrderStatus,
         timeline: [acceptTimeline, ...order.timeline]
       };
+      void saveOrderToFirestore(updatedOrder, false);
+      return updatedOrder;
     }));
   };
 
-  // Handle updating full order details (e.g. physical shoe inspection by Courier Soleman)
+  // Handle updating full order details (e.g. physical shoe inspection by Courier Soleman) & sync to Firebase Firestore
   const handleUpdateOrderDetails = (orderId: string, updatedFields: Partial<Order>, logNote?: string) => {
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
     setOrders(prev => prev.map(order => {
@@ -221,20 +198,23 @@ export const App: React.FC = () => {
             ...order.timeline,
           ]
         : order.timeline;
-      return {
+      const updatedOrder: Order = {
         ...order,
         ...updatedFields,
         timeline: nextTimeline,
       };
+      void saveOrderToFirestore(updatedOrder, false);
+      return updatedOrder;
     }));
   };
 
-  // Handle deleting/removing order from portal
+  // Handle deleting/removing order from portal & Firebase Firestore
   const handleDeleteOrder = (orderId: string) => {
     setOrders(prev => prev.filter(o => o.id !== orderId));
+    void deleteOrderFromFirestore(orderId);
   };
 
-  // Handle rejecting order by Admin
+  // Handle rejecting order by Admin & sync to Firebase Firestore
   const handleRejectOrder = (orderId: string, reason: string) => {
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
     setOrders(prev => prev.map(order => {
@@ -247,16 +227,18 @@ export const App: React.FC = () => {
         description: `Pesanan dibatalkan/ditolak admin: ${reason}`
       };
 
-      return {
+      const updatedOrder: Order = {
         ...order,
         isAcceptedByAdmin: false,
         customNotes: (order.customNotes ? order.customNotes + ' • ' : '') + `[Admin: ${reason}]`,
         timeline: [rejectTimeline, ...order.timeline]
       };
+      void saveOrderToFirestore(updatedOrder, false);
+      return updatedOrder;
     }));
   };
 
-  // Handle updating order status (from Dashboard Kurir / Admin)
+  // Handle updating order status (jemput, workshop, siap antar, selesai) & sync immediately to Firebase Firestore
   const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus, customNote?: string) => {
     setOrders(prev => prev.map(order => {
       if (order.id !== orderId) return order;
@@ -268,27 +250,31 @@ export const App: React.FC = () => {
         description: customNote || getDefaultStatusDescription(newStatus, order)
       };
 
-      return {
+      const updatedOrder: Order = {
         ...order,
         isAcceptedByAdmin: true,
         status: newStatus,
         timeline: [newTimelineItem, ...order.timeline]
       };
+      void saveOrderToFirestore(updatedOrder, false);
+      return updatedOrder;
     }));
   };
 
-  // Handle updating payment status (from Courier or Admin)
+  // Handle updating payment status (from Courier or Admin) & sync to Firebase Firestore
   const handleUpdatePaymentStatus = (orderId: string, paymentStatus: PaymentStatus) => {
     setOrders(prev => prev.map(order => {
       if (order.id !== orderId) return order;
-      return {
+      const updatedOrder: Order = {
         ...order,
         paymentStatus
       };
+      void saveOrderToFirestore(updatedOrder, false);
+      return updatedOrder;
     }));
   };
 
-  // Handle updating customer Sherlock & Patokan location on Courier Dashboard
+  // Handle updating customer Sherlock & Patokan location on Courier Dashboard & sync to Firebase Firestore
   const handleUpdateOrderLocation = (
     orderId: string,
     locUpdate: {
@@ -311,7 +297,7 @@ export const App: React.FC = () => {
         timestamp: timeStr,
         description: `Lokasi Sherlock WA & Patokan disinkronkan akurat: ${updatedLandmark || updatedFullAddress}.`
       };
-      return {
+      const updatedOrder: Order = {
         ...order,
         location: {
           ...order.location,
@@ -320,6 +306,8 @@ export const App: React.FC = () => {
         },
         timeline: [locTimeline, ...order.timeline]
       };
+      void saveOrderToFirestore(updatedOrder, false);
+      return updatedOrder;
     }));
   };
 
