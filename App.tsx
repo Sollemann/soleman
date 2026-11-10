@@ -13,7 +13,6 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { CourierDashboard } from './components/CourierDashboard';
 import { CourierLoginModal } from './components/CourierLoginModal';
-import { WorkshopLocationSection } from './components/WorkshopLocationSection';
 import { TestimonialsAndFaq } from './components/TestimonialsAndFaq';
 import { CustomerTrackerModal } from './components/CustomerTrackerModal';
 import { StaffAccessModal } from './components/StaffAccessModal';
@@ -707,16 +706,14 @@ export const App: React.FC = () => {
           onOpenDashboard={() => handleScrollToSection('dashboard')}
         />
 
-        {/* 6. DASHBOARD PELANGGAN: Hanya Pelacakan Kode Seri Sepatu yang Tepat (Privasi Terjamin, Tanpa Order Lain) */}
+        {/* 6. DASHBOARD PELANGGAN: Pelacakan Sepatu & Berbagi Lokasi Terkini ke Kurir */}
         <DashboardView
           orders={orders}
           onOpenBooking={() => handleScrollToSection('antar-jemput')}
+          onUpdateOrderLocation={handleUpdateOrderLocation}
         />
 
-        {/* 7. Physical Workshop & Coverage Section Cirebon (Sukalila Selatan) */}
-        <WorkshopLocationSection />
-
-        {/* 8. Testimonials & FAQs + Write Review Form */}
+        {/* 7. Testimonials & FAQs + Write Review Form */}
         <TestimonialsAndFaq />
       </main>
 

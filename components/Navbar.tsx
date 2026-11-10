@@ -77,7 +77,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'kalkulator', label: 'Kalkulator', icon: Calculator },
     { id: 'antar-jemput', label: 'Antar-Jemput', icon: Truck },
     { id: 'dashboard', label: 'Lacak Sepatu', icon: Search },
-    { id: 'workshop', label: 'Sukalila Workshop', icon: MapPin },
   ];
 
   const handleNavClick = (id: string) => {

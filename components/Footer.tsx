@@ -66,7 +66,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onStaffAccess }) => 
                   onClick={() => onNavigate('antar-jemput')} 
                   className="hover:text-amber-400 transition-colors text-left"
                 >
-                  Form Antar-Jemput (Lokasi Otomatis via WA)
+                  Antar-Jemput & Berbagi Lokasi Web
                 </button>
               </li>
               <li>
@@ -79,10 +79,10 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onStaffAccess }) => 
               </li>
               <li>
                 <button 
-                  onClick={() => onNavigate('workshop')} 
+                  onClick={() => onNavigate('kalkulator')} 
                   className="hover:text-amber-400 transition-colors text-left"
                 >
-                  Workshop Jl. Sukalila Selatan Cirebon
+                  Kalkulator Estimasi Biaya Servis
                 </button>
               </li>
             </ul>

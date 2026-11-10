@@ -102,7 +102,9 @@ export interface PickupLocation {
   lng?: number;
   accuracy?: number;
   mapsUrl?: string;
-  shareLocViaWhatsApp?: boolean; // Lokasi otomatis dishare via WhatsApp
+  shareLocViaWhatsApp?: boolean; // Lokasi dishare via WhatsApp (opsional)
+  isLiveShared?: boolean; // Lokasi akurat dibagikan langsung ke web kurir (tanpa WA)
+  liveSharedAt?: string; // Waktu update lokasi terkini
 }
 
 export interface OrderTimelineStep {
