@@ -22,6 +22,39 @@ export const WORKSHOP_INFO = {
   danaName: 'SOLEMAN SHOES REPAIR',
 };
 
+// 5 Kecamatan Resmi di Wilayah Kota Cirebon (Seluruhnya GRATIS ONGKIR Otomatis)
+export const KOTA_CIREBON_KECAMATAN = [
+  'Kesambi',
+  'Kejaksan',
+  'Pekalipan',
+  'Lemahwungkuk',
+  'Harjamukti'
+] as const;
+
+/**
+ * Menghitung jarak garis lurus (Haversine formula) dalam Kilometer (KM)
+ * dari titik koordinat pelanggan ke Workshop Soleman Sukalila Selatan Cirebon
+ */
+export function calculateDistanceToWorkshop(
+  lat: number,
+  lng: number,
+  workshopLat: number = WORKSHOP_INFO.lat,
+  workshopLng: number = WORKSHOP_INFO.lng
+): number {
+  const R = 6371; // Jari-jari bumi dalam KM
+  const dLat = ((workshopLat - lat) * Math.PI) / 180;
+  const dLon = ((workshopLng - lng) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat * Math.PI) / 180) *
+      Math.cos((workshopLat * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distanceKm = R * c;
+  return Math.round(distanceKm * 10) / 10; // 1 desimal, misal 2.4 KM
+}
+
 // Daftar Kecamatan Se-Cirebon (Kota & Kabupaten)
 export const CIREBON_AREAS: CirebonArea[] = [
   // KOTA CIREBON (5 KECAMATAN RESMI)

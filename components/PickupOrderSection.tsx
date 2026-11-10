@@ -23,7 +23,10 @@ import {
   DollarSign, 
   QrCode, 
   Share2,
-  Navigation
+  Navigation,
+  Crosshair,
+  Compass,
+  Zap
 } from 'lucide-react';
 import { 
   SERVICES_CATALOG, 
@@ -31,6 +34,8 @@ import {
   ALL_CIREBON_KECAMATAN_SUGGESTIONS,
   DISTANCE_ZONES,
   WORKSHOP_INFO, 
+  KOTA_CIREBON_KECAMATAN,
+  calculateDistanceToWorkshop,
   SHOE_MATERIALS, 
   DAMAGE_SEVERITIES, 
   calculateServicePrice,
@@ -163,31 +168,67 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   const [landmark, setLandmark] = useState('');
   const [waShareLocLink, setWaShareLocLink] = useState('');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [isLocatingGps, setIsLocatingGps] = useState(false);
   const [gpsStatusMsg, setGpsStatusMsg] = useState('');
 
+  // Deteksi Sherlock GPS Otomatis 1-Klik & Hitung Jarak ke Workshop Sukalila
   const handleDetectSherlockGps = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setGpsStatusMsg('Browser tidak mendukung GPS otomatis. Silakan isi Patokan atau tempel link Share Loc WA.');
+      setGpsStatusMsg('Perangkat Anda belum mendukung GPS otomatis. Silakan pilih salah satu tombol Kecamatan Cirebon di bawah (1 Klik Tanpa Ketik).');
       return;
     }
     setIsLocatingGps(true);
-    setGpsStatusMsg('Mengunci titik koordinat Sherlock GPS akurat Anda...');
+    setGpsStatusMsg('🛰️ Sedang mengunci titik GPS akurat & menghitung jarak ke Workshop Sukalila...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const lat = Number(pos.coords.latitude.toFixed(6));
         const lng = Number(pos.coords.longitude.toFixed(6));
         const accuracy = Math.round(pos.coords.accuracy || 10);
+        const dist = calculateDistanceToWorkshop(lat, lng);
+
         setGpsCoords({ lat, lng, accuracy });
+        setDistanceKm(dist);
         setWaShareLocLink(`https://www.google.com/maps?q=${lat},${lng}`);
         setIsLocatingGps(false);
-        setGpsStatusMsg(`✓ Titik Sherlock Terkunci Akurat (${lat}, ${lng} • ±${accuracy}m) — Otomatis masuk Dashboard Kurir!`);
+
+        // Jika Jarak <= 6.5 KM (Atau berada di Wilayah Cirebon Kota)
+        if (dist <= 6.5) {
+          setAreaType('Kota');
+          setDistanceZone('dekat_kota');
+          setLogisticsPartner('kurir_soleman');
+          if (!areaName || areaName === 'Kesambi' || areaName.includes('Cirebon')) {
+            setAreaName('Kota Cirebon');
+          }
+          if (!landmark || landmark.startsWith('Titik GPS') || landmark.startsWith('Wilayah Kec.')) {
+            setLandmark(`Titik GPS Akurat (${dist} KM dari Sukalila • ±${accuracy}m)`);
+          }
+          setGpsStatusMsg(`✓ Lokasi Terkunci: Jarak ${dist} KM dari Workshop Sukalila • Wilayah Kota Cirebon (🎉 GRATIS ONGKIR AKTIF Rp 0!)`);
+        } else if (dist <= 25) {
+          setAreaType('Kabupaten');
+          setDistanceZone('jauh_kabupaten');
+          setLogisticsPartner('grab_maxim');
+          if (!areaName || areaName === 'Kesambi' || areaName.includes('Cirebon')) {
+            setAreaName('Kabupaten Cirebon');
+          }
+          if (!landmark || landmark.startsWith('Titik GPS') || landmark.startsWith('Wilayah Kec.')) {
+            setLandmark(`Titik GPS Akurat (${dist} KM dari Sukalila • ±${accuracy}m)`);
+          }
+          setGpsStatusMsg(`✓ Lokasi Terkunci: Jarak ${dist} KM dari Workshop Sukalila • Wilayah Kab. Cirebon (Ongkir Rp 10.000 / Gratis min. 2 pasang)`);
+        } else {
+          setDistanceZone('luar_cirebon');
+          setLogisticsPartner('jnt_express');
+          if (!areaName || areaName === 'Kesambi') {
+            setAreaName('Luar Cirebon');
+          }
+          setGpsStatusMsg(`✓ Lokasi Terkunci: Jarak ${dist} KM — Wilayah Luar Cirebon (Ekspedisi J&T Express)`);
+        }
       },
       () => {
         setIsLocatingGps(false);
-        setGpsStatusMsg('Izin GPS belum aktif. Tenang, Patokan & Share Loc di chat WA tetap otomatis masuk ke Dashboard Kurir!');
+        setGpsStatusMsg('Izin GPS belum aktif di browser HP. Jangan khawatir, klik tombol Kecamatan Cirebon di bawah (1 Klik Tanpa Ketik), Gratis Ongkir tetap otomatis berlaku!');
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   };
 
@@ -300,16 +341,26 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
   const totalServicesPrice = shoeDetailsWithPrices.reduce((sum, s) => sum + s.price, 0);
 
-  // ATURAN ONGKIR BERDASARKAN JARAK:
-  // Zona 1 (Dekat Kota Cirebon <6KM): GRATIS ONGKIR
-  // Zona 2 (Jauh Kabupaten Cirebon >6KM): Gratis min. 2 pasang / Rp 10.000 jika 1 pasang (Bisa Instant Grab/Maxim)
-  // Zona 3 (Luar Cirebon): Estimasi Ekspedisi J&T Express Rp 15.000
+  // ATURAN ONGKIR REAL-TIME BERDASARKAN WILAYAH & JARAK KE WORKSHOP SUKALILA:
+  // 1. Drop-off Mandiri ke Workshop Sukalila: GRATIS (Rp 0)
+  // 2. Seluruh Wilayah Kota Cirebon (5 Kecamatan Resmi: Kesambi, Kejaksan, Pekalipan, Lemahwungkuk, Harjamukti
+  //    atau Jarak GPS <= 6.5 KM atau Zona Dekat Kota): SELALU GRATIS ONGKIR OTOMATIS (Rp 0)
+  // 3. Kabupaten Cirebon: GRATIS jika order >= 2 pasang / Rp 10.000 jika hanya 1 pasang
+  // 4. Luar Cirebon: Ekspedisi J&T Express Rp 15.000
+  const isCirebonKotaAuto =
+    distanceZone === 'dekat_kota' ||
+    areaType === 'Kota' ||
+    (distanceKm !== null && distanceKm <= 6.5) ||
+    KOTA_CIREBON_KECAMATAN.some(k => areaName.toLowerCase().includes(k.toLowerCase()));
+
   let deliveryFee = 0;
   if (pickupType === 'drop_off') {
     deliveryFee = 0;
   } else if (distanceZone === 'luar_cirebon') {
     deliveryFee = 15000;
-  } else if (distanceZone === 'jauh_kabupaten') {
+  } else if (isCirebonKotaAuto) {
+    deliveryFee = 0; // GRATIS ONGKIR OTOMATIS CIREBON KOTA
+  } else if (distanceZone === 'jauh_kabupaten' || areaType === 'Kabupaten') {
     deliveryFee = pairsCount >= 2 ? 0 : 10000;
   } else {
     deliveryFee = 0;
@@ -1001,16 +1052,19 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
           </div>
 
-          {/* Card 3: LOKASI OTOMATIS LEWAT WHATSAPP (TANPA KETIK ALAMAT / KOORDINAT GPS) */}
+          {/* Card 3: FITUR LOKASI OTOMATIS & GRATIS ONGKIR CIREBON KOTA */}
           <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-6 space-y-5 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2.5">
                 <span className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center justify-center">3</span>
-                <h3 className="text-sm font-bold text-white">Antar-Jemput & Lokasi Otomatis via WhatsApp</h3>
+                <h3 className="text-sm font-bold text-white">Lokasi Jemput & Gratis Ongkir Otomatis</h3>
               </div>
-              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold">
-                Share Loc Otomatis
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 font-extrabold flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-emerald-400" />
+                  <span>GPS 1-Klik • Bebas Repot Ketik</span>
+                </span>
+              </div>
             </div>
 
             {/* Metode Layanan */}
@@ -1026,7 +1080,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                   onClick={() => setPickupType(m.id as any)}
                   className={`p-2.5 rounded-xl text-left border transition-all ${
                     pickupType === m.id
-                      ? 'bg-amber-500/15 border-amber-500 text-white font-bold'
+                      ? 'bg-amber-500/15 border-amber-500 text-white font-bold ring-1 ring-amber-500/30'
                       : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                   }`}
                 >
@@ -1038,88 +1092,324 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
             {pickupType !== 'drop_off' && (
               <div className="space-y-4">
-                
-                {/* 1. TULIS WILAYAH KECAMATAN DI CIREBON */}
-                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                      Kecamatan di Cirebon (Bisa Ditulis Bebas) *
-                    </label>
-                    <span className="text-[10px] text-amber-400 font-semibold">Tersedia untuk seluruh Cirebon</span>
+
+                {/* 1. FITUR UTAMA: AMBIL LOKASI SAYA OTOMATIS (GPS 1-KLIK TANPA KETIK) */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-950/60 via-slate-950 to-slate-950 border-2 border-emerald-500/50 shadow-lg shadow-emerald-950/30 space-y-3.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                        <Crosshair className={`w-4 h-4 ${isLocatingGps ? 'animate-spin text-amber-400' : ''}`} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-white flex items-center gap-1.5">
+                          <span>📍 Ambil Lokasi Saya Otomatis (GPS 1-Klik)</span>
+                          <span className="text-[9px] bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded font-black">
+                            REKOMENDASI
+                          </span>
+                        </h4>
+                        <p className="text-[10px] text-slate-400">
+                          Tanpa repot ketik alamat • Otomatis ukur jarak KM ke Workshop Sukalila & terapkan Gratis Ongkir
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="relative">
-                    <input
-                      type="text"
-                      list="cirebon-kecamatan-options"
-                      value={areaName}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setAreaName(val);
-                        const lower = val.toLowerCase();
-                        const isKota = ['kesambi', 'kejaksan', 'pekalipan', 'lemahwungkuk', 'harjamukti'].some(k => lower.includes(k));
-                        if (isKota) {
-                          setAreaType('Kota');
-                        } else if (val.trim().length >= 4) {
-                          setAreaType('Kabupaten');
-                        }
-                      }}
-                      placeholder="Tulis nama kecamatan Anda, misal: Kesambi, Kedawung, Sumber, Weru..."
-                      className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
-                    />
-                    <datalist id="cirebon-kecamatan-options">
-                      {ALL_CIREBON_KECAMATAN_SUGGESTIONS.map(kec => (
-                        <option key={kec} value={kec} />
-                      ))}
-                    </datalist>
+                  <button
+                    type="button"
+                    onClick={handleDetectSherlockGps}
+                    disabled={isLocatingGps}
+                    className="w-full py-3.5 px-4 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-70"
+                  >
+                    <Compass className={`w-4 h-4 stroke-[2.5] ${isLocatingGps ? 'animate-spin' : ''}`} />
+                    <span>
+                      {isLocatingGps 
+                        ? '🛰️ Sedang Mengunci GPS & Mengukur Jarak...' 
+                        : gpsCoords 
+                        ? '🔄 Kunci Ulang Titik GPS Saya Sekarang' 
+                        : '📍 KLIK DISINI: Ambil Lokasi Saya Otomatis (Bebas Ketik)'}
+                    </span>
+                  </button>
+
+                  {/* HASIL DETEKSI GPS & JARAK KE WORKSHOP */}
+                  {gpsCoords && (
+                    <div className="p-3.5 rounded-xl bg-slate-900/90 border border-emerald-500/40 space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                        <div className="flex items-center gap-2 text-emerald-300 font-mono font-bold">
+                          <span>🛰️ Koordinat GPS: {gpsCoords.lat.toFixed(5)}, {gpsCoords.lng.toFixed(5)}</span>
+                          <span className="text-[10px] text-slate-400 font-sans">±{gpsCoords.accuracy}m</span>
+                        </div>
+                        {distanceKm !== null && (
+                          <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 font-black text-xs border border-emerald-500/30 font-mono">
+                            🎯 Jarak: {distanceKm} KM ke Workshop
+                          </span>
+                        )}
+                      </div>
+
+                      {distanceKm !== null && distanceKm <= 6.5 ? (
+                        <div className="p-2.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center gap-2 text-xs font-bold text-emerald-200">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>
+                            🎉 <strong>WILAYAH KOTA CIREBON ({distanceKm} KM)</strong> — Terdeteksi dalam radius layanan utama. <strong>GRATIS ONGKIR Rp 0 OTOMATIS!</strong>
+                          </span>
+                        </div>
+                      ) : distanceKm !== null && distanceKm <= 25 ? (
+                        <div className="p-2.5 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center gap-2 text-xs font-bold text-amber-200">
+                          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>
+                            📍 <strong>WILAYAH KABUPATEN CIREBON ({distanceKm} KM)</strong> — Ongkir Rp 10.000 (Otomatis <strong>GRATIS</strong> jika order 2 pasang atau lebih).
+                          </span>
+                        </div>
+                      ) : null}
+
+                      {waShareLocLink && (
+                        <div className="flex items-center justify-between pt-1 text-[11px]">
+                          <span className="text-slate-400">Titik lokasi otomatis tersambung ke Kurir & WhatsApp</span>
+                          <a
+                            href={waShareLocLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-emerald-400 hover:text-emerald-300 underline font-semibold flex items-center gap-1"
+                          >
+                            <span>Lihat di Google Maps</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {gpsStatusMsg && !gpsCoords && (
+                    <div className="p-3 rounded-xl bg-slate-900/90 border border-amber-500/30 text-xs text-amber-300 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>{gpsStatusMsg}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. PILIHAN 1-KLIK 5 KECAMATAN RESMI KOTA CIREBON (SEMUA GRATIS ONGKIR RP 0 - BEBAS KETIK) */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-slate-950 border border-emerald-500/30 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-emerald-400">
+                          🏙️ 5 Kecamatan Resmi Kota Cirebon (1-Klik Bebas Ketik)
+                        </span>
+                        <span className="text-[9px] bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-full font-black">
+                          100% GRATIS ONGKIR
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Tinggal klik salah satu kecamatan tempat tinggal Anda di bawah — Ongkir otomatis Rp 0:
+                      </p>
+                    </div>
                   </div>
 
-                  {/* Pilihan Cepat Kecamatan Cirebon */}
-                  <div>
-                    <span className="text-[10px] text-slate-400 block mb-1.5 font-medium">Klik Rekomendasi Kecamatan:</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { name: 'Kesambi', type: 'Kota' as const },
-                        { name: 'Kejaksan', type: 'Kota' as const },
-                        { name: 'Harjamukti', type: 'Kota' as const },
-                        { name: 'Pekalipan', type: 'Kota' as const },
-                        { name: 'Lemahwungkuk', type: 'Kota' as const },
-                        { name: 'Kedawung', type: 'Kabupaten' as const },
-                        { name: 'Weru / Plered', type: 'Kabupaten' as const },
-                        { name: 'Sumber', type: 'Kabupaten' as const },
-                        { name: 'Gunung Jati', type: 'Kabupaten' as const },
-                        { name: 'Tengah Tani', type: 'Kabupaten' as const },
-                        { name: 'Talun', type: 'Kabupaten' as const },
-                        { name: 'Mundu', type: 'Kabupaten' as const },
-                        { name: 'Plumbon', type: 'Kabupaten' as const },
-                      ].map(item => (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {[
+                      { 
+                        name: 'Kesambi', 
+                        sub: 'Cipto, Sudarsono, Sunyaragi, Drajat',
+                        badge: 'GRATIS ONGKIR' 
+                      },
+                      { 
+                        name: 'Kejaksan', 
+                        sub: 'Siliwangi, Kartini, Sukapura, Kebonbaru',
+                        badge: 'GRATIS ONGKIR' 
+                      },
+                      { 
+                        name: 'Pekalipan', 
+                        sub: 'Pulasaren, Jagasatru, Pekalangan, Sukalila',
+                        badge: 'GRATIS ONGKIR' 
+                      },
+                      { 
+                        name: 'Lemahwungkuk', 
+                        sub: 'Kasepuhan, Pegambiran, Cangkol, Panjunan',
+                        badge: 'GRATIS ONGKIR' 
+                      },
+                      { 
+                        name: 'Harjamukti', 
+                        sub: 'Kalijaga, Larangan, Argasunya, Perumnas',
+                        badge: 'GRATIS ONGKIR' 
+                      },
+                    ].map(item => {
+                      const isSelected = areaName.toLowerCase().includes(item.name.toLowerCase());
+                      return (
                         <button
                           key={item.name}
                           type="button"
                           onClick={() => {
                             setAreaName(item.name);
-                            setAreaType(item.type);
+                            setAreaType('Kota');
+                            setDistanceZone('dekat_kota');
+                            setLogisticsPartner('kurir_soleman');
+                            if (!landmark || landmark.startsWith('Wilayah Kec.') || landmark.startsWith('Titik GPS')) {
+                              setLandmark(`Wilayah Kec. ${item.name} (Kota Cirebon)`);
+                            }
+                            setGpsStatusMsg(`✓ Kecamatan ${item.name} dipilih! Wilayah Kota Cirebon — 🎉 GRATIS ONGKIR OTOMATIS (Rp 0)!`);
                           }}
-                          className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all ${
-                            areaName.toLowerCase().includes(item.name.toLowerCase().split(' ')[0])
-                              ? 'bg-amber-500/25 border-amber-400 text-amber-300 font-bold shadow-sm'
-                              : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                          className={`p-3 rounded-xl border text-left transition-all relative ${
+                            isSelected
+                              ? 'bg-emerald-500/20 border-emerald-400 ring-2 ring-emerald-400/50 text-white shadow-md'
+                              : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-emerald-500/40 hover:bg-slate-900/80'
                           }`}
                         >
-                          {item.name} <span className="opacity-70 text-[9px]">({item.type})</span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-black text-white">Kec. {item.name}</span>
+                            <span className={`text-[9px] font-black px-1.5 py-0.2 rounded ${
+                              isSelected ? 'bg-emerald-400 text-slate-950' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            }`}>
+                              {item.badge}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-tight truncate">{item.sub}</p>
                         </button>
-                      ))}
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. PILIHAN 1-KLIK KECAMATAN KABUPATEN CIREBON */}
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                      📍 Atau Pilih Kecamatan Kabupaten Cirebon:
+                    </span>
+                    <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                      Gratis Min. 2 Pasang / Rp 10.000
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { name: 'Kedawung / Tuparev' },
+                      { name: 'Weru / Plered' },
+                      { name: 'Sumber' },
+                      { name: 'Gunung Jati' },
+                      { name: 'Tengah Tani' },
+                      { name: 'Talun' },
+                      { name: 'Mundu' },
+                      { name: 'Plumbon' },
+                      { name: 'Palimanan' },
+                      { name: 'Klangenan' },
+                      { name: 'Astanajapura' },
+                    ].map(item => {
+                      const isSelected = areaName.toLowerCase().includes(item.name.toLowerCase().split(' ')[0]);
+                      return (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => {
+                            setAreaName(item.name);
+                            setAreaType('Kabupaten');
+                            setDistanceZone('jauh_kabupaten');
+                            setLogisticsPartner('grab_maxim');
+                            if (!landmark || landmark.startsWith('Wilayah Kec.') || landmark.startsWith('Titik GPS')) {
+                              setLandmark(`Wilayah Kec. ${item.name} (Kab. Cirebon)`);
+                            }
+                          }}
+                          className={`text-[10px] px-2.5 py-1.5 rounded-lg border transition-all ${
+                            isSelected
+                              ? 'bg-amber-500/25 border-amber-400 text-amber-300 font-bold shadow-sm'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                          }`}
+                        >
+                          {item.name} <span className="opacity-70 text-[9px]">(Kabupaten)</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 4. TULIS MANUAL KECAMATAN / DESA (OPSIONAL) */}
+                <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-bold text-slate-300">
+                      Cari / Ketik Nama Kecamatan Lain (Jika Tidak Ada di Pilihan Cepat):
+                    </label>
+                    <span className="text-[10px] text-slate-500">Opsional</span>
+                  </div>
+                  <input
+                    type="text"
+                    list="cirebon-kecamatan-options"
+                    value={areaName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAreaName(val);
+                      const lower = val.toLowerCase();
+                      const isKota = KOTA_CIREBON_KECAMATAN.some(k => lower.includes(k.toLowerCase()));
+                      if (isKota) {
+                        setAreaType('Kota');
+                        setDistanceZone('dekat_kota');
+                        setLogisticsPartner('kurir_soleman');
+                      } else if (val.trim().length >= 4) {
+                        setAreaType('Kabupaten');
+                        setDistanceZone('jauh_kabupaten');
+                      }
+                    }}
+                    placeholder="Ketik kecamatan Anda, misal: Kedawung, Weru, Astanajapura..."
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
+                  />
+                  <datalist id="cirebon-kecamatan-options">
+                    {ALL_CIREBON_KECAMATAN_SUGGESTIONS.map(kec => (
+                      <option key={kec} value={kec} />
+                    ))}
+                  </datalist>
+                </div>
+
+                {/* 5. LIVE BANNER: STATUS JARAK & GRATIS ONGKIR OTOMATIS */}
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  isCirebonKotaAuto
+                    ? 'bg-gradient-to-r from-emerald-950/70 via-slate-900 to-slate-900 border-emerald-500/50 shadow-md'
+                    : distanceZone === 'jauh_kabupaten'
+                    ? 'bg-gradient-to-r from-amber-950/70 via-slate-900 to-slate-900 border-amber-500/40 shadow-md'
+                    : 'bg-slate-900 border-slate-800'
+                }`}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs ${
+                        isCirebonKotaAuto 
+                          ? 'bg-emerald-500 text-slate-950' 
+                          : 'bg-amber-500/20 text-amber-300'
+                      }`}>
+                        {isCirebonKotaAuto ? '✓' : '📍'}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-white">
+                            {isCirebonKotaAuto ? 'WILAYAH KOTA CIREBON' : 'WILAYAH KABUPATEN CIREBON'}
+                          </span>
+                          {distanceKm !== null && (
+                            <span className="text-[10px] font-mono px-2 py-0.2 rounded bg-slate-950 border border-slate-700 text-emerald-300 font-bold">
+                              Jarak {distanceKm} KM
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-300 mt-0.5">
+                          Kecamatan terpilih: <strong className="text-white font-bold">{areaName}</strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block font-semibold">Biaya Ongkir Kurir:</span>
+                      <span className={`text-sm sm:text-base font-black ${
+                        deliveryFee === 0 ? 'text-emerald-400' : 'text-amber-300 font-mono'
+                      }`}>
+                        {deliveryFee === 0 
+                          ? (isCirebonKotaAuto ? '🎉 GRATIS ONGKIR (Rp 0)' : '🎉 GRATIS ONGKIR (2+ Psg)') 
+                          : `Rp ${deliveryFee.toLocaleString('id-ID')}`}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                {/* PILIHAN ZONA JARAK & LOGISTIK PENGANTARAN */}
+                {/* 6. PILIHAN ZONA JARAK & LOGISTIK PENGANTARAN */}
                 <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                      Pilih Zona Jarak & Logistik Pengantaran:
+                      Pilihan Zona Pengantaran & Ekspedisi:
                     </label>
-                    <span className="text-[10px] text-amber-400 font-semibold">Tersedia Grab, Maxim & J&T</span>
+                    <span className="text-[10px] text-amber-400 font-semibold">Tersedia Kurir, Grab, Maxim & J&T</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -1143,7 +1433,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                         </span>
                       </div>
                       <p className="text-[10px] text-emerald-400 font-semibold">Kurir Internal Soleman</p>
-                      <p className="text-[10px] text-slate-400 mt-1 leading-tight">Radius &lt; 6 KM (Kesambi, Kejaksan, Pekalipan, Harjamukti, dll)</p>
+                      <p className="text-[10px] text-slate-400 mt-1 leading-tight">Radius &lt; 6 KM (Kesambi, Kejaksan, Pekalipan, Lemahwungkuk, Harjamukti)</p>
                     </div>
 
                     {/* Zona 2: Jauh Kabupaten */}
@@ -1188,7 +1478,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                         </span>
                       </div>
                       <p className="text-[10px] text-sky-400 font-semibold">J&T, SiCepat, JNE</p>
-                      <p className="text-[10px] text-slate-400 mt-1 leading-tight">Kuningan, Majalengka, Indramayu, Jabodetabek & Antar-Kota.</p>
+                      <p className="text-[10px] text-slate-400 mt-1 leading-tight">Kuningan, Majalengka, Indramayu, Brebes, Jabodetabek & Antar-Kota.</p>
                     </div>
                   </div>
 
@@ -1218,22 +1508,21 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                   )}
                 </div>
 
-                {/* HIGHLIGHT: KIRIM SHERLOCK ASLI YANG ADA DI FITUR WA LANGSUNG KE KURIR AGAR AKURAT */}
+                {/* 7. PATOKAN RUMAH / CIRI-CIRI LOKASI (OTOMATIS MASUK KE DASHBOARD KURIR) */}
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/50 via-slate-950 to-slate-950 border border-emerald-500/40 space-y-3.5">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
                       <MapPin className="w-4 h-4 text-emerald-400" />
-                      <span>Kirim Sherlock Asli Lewat Fitur 📍 Lokasi di WhatsApp Kurir</span>
+                      <span>🚩 Patokan Rumah / Lokasi Penjemputan</span>
                     </div>
                     <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-                      100% Akurat Sampai Depan Rumah
+                      Otomatis Terbaca di HP Kurir
                     </span>
                   </div>
 
-                  {/* 1. Patokan Rumah / Ciri-Ciri Lokasi (Otomatis Masuk ke Dashboard Kurir) */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-extrabold uppercase tracking-wider text-amber-300">
-                      🚩 Patokan Rumah / Ciri-Ciri Lokasi (Otomatis Masuk ke Dashboard Kurir) *
+                      Patokan / Ciri Rumah Anda (Bisa Tambah No. Rumah / Warna Pagar):
                     </label>
                     <input
                       type="text"
@@ -1243,11 +1532,11 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                       className="w-full bg-slate-900 border border-amber-500/40 focus:border-amber-400 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none"
                     />
                     <span className="text-[10px] text-slate-400 block">
-                      Patokan ini otomatis tercatat di Dashboard Kurir dan di pesan WhatsApp Anda.
+                      Sudah terisi otomatis dari GPS/Kecamatan. Anda juga bisa menambahkan patokan lebih detail.
                     </span>
                   </div>
 
-                  {/* 2. Visual Panduan Fitur Sherlock Asli Bawaan WhatsApp */}
+                  {/* Visual Panduan Fitur Sherlock Asli Bawaan WhatsApp */}
                   <div className="p-3.5 rounded-xl bg-slate-900/95 border border-emerald-500/30 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-extrabold text-white flex items-center gap-1.5">
@@ -1288,7 +1577,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                     <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                       <span>
-                        Dengan mengirim <strong>Sherlock Asli dari fitur 📍 Lokasi di dalam WhatsApp</strong>, titik rumah Anda langsung terbaca akurat oleh Kurir Soleman tanpa meleset!
+                        Dengan GPS otomatis & Sherlock WhatsApp, titik rumah Anda langsung akurat masuk ke HP Kurir Soleman tanpa meleset!
                       </span>
                     </div>
                   </div>

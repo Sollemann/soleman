@@ -128,7 +128,7 @@ export function subscribeToOrdersRealtime(
     onOrdersUpdate(list);
   };
 
-  const handleSnapshot = (snapshot: any, sourceDb: any) => {
+  const handleSnapshot = (snapshot: any, sourceDb: any, colName: string) => {
     onSyncStateChange?.('connected');
     onErrorChange?.(null);
 
@@ -136,12 +136,9 @@ export function subscribeToOrdersRealtime(
       const data = docSnap.data() as StoredOrderDocument;
       if (!data || !data.id) return;
 
-      // Hapus data contoh lama jika pernah tersimpan
-      if (
-        LEGACY_SAMPLE_IDS.has(data.id) ||
-        data.customerName?.toLowerCase() === 'budi santoso'
-      ) {
-        void deleteDoc(doc(sourceDb, ORDERS_COLLECTION, docSnap.id)).catch(() => {});
+      // Hapus data contoh bawaan jika pernah tersimpan sebelumnya
+      if (LEGACY_SAMPLE_IDS.has(data.id)) {
+        void deleteDoc(doc(sourceDb, colName, docSnap.id)).catch(() => {});
         return;
       }
 
@@ -155,34 +152,39 @@ export function subscribeToOrdersRealtime(
   };
 
   const unsubs: (() => void)[] = [];
+  const collectionsToListen = ['oderan', 'orders', 'orderan'];
 
-  // 1. Listener Database Utama (ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528)
-  try {
-    const unsubExplicit = onSnapshot(
-      collection(db, ORDERS_COLLECTION),
-      (snap) => handleSnapshot(snap, db),
-      (err) => {
-        console.warn('Explicit DB listener warning:', err.message);
-      }
-    );
-    unsubs.push(unsubExplicit);
-  } catch (e) {
-    console.warn('Failed to attach explicit listener:', e);
-  }
-
-  // 2. Listener Database Default (default) untuk sinkronisasi cadangan lintas HP
-  if (dbDefault && dbDefault !== db) {
+  // 1. Listeners Database Utama (ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528)
+  for (const colName of collectionsToListen) {
     try {
-      const unsubDefault = onSnapshot(
-        collection(dbDefault, ORDERS_COLLECTION),
-        (snap) => handleSnapshot(snap, dbDefault),
+      const unsub = onSnapshot(
+        collection(db, colName),
+        (snap) => handleSnapshot(snap, db, colName),
         (err) => {
-          console.warn('Default DB listener warning:', err.message);
+          console.warn(`Explicit DB listener (${colName}) warning:`, err.message);
         }
       );
-      unsubs.push(unsubDefault);
+      unsubs.push(unsub);
     } catch (e) {
-      console.warn('Failed to attach default listener:', e);
+      console.warn(`Failed to attach explicit listener for ${colName}:`, e);
+    }
+  }
+
+  // 2. Listeners Database Default (default) untuk sinkronisasi cadangan lintas HP
+  if (dbDefault && dbDefault !== db) {
+    for (const colName of collectionsToListen) {
+      try {
+        const unsub = onSnapshot(
+          collection(dbDefault, colName),
+          (snap) => handleSnapshot(snap, dbDefault, colName),
+          (err) => {
+            console.warn(`Default DB listener (${colName}) warning:`, err.message);
+          }
+        );
+        unsubs.push(unsub);
+      } catch (e) {
+        console.warn(`Failed to attach default listener for ${colName}:`, e);
+      }
     }
   }
 
@@ -211,12 +213,14 @@ export async function saveOrderToFirestore(
   const writes: Promise<any>[] = [
     setDoc(doc(db, ORDERS_COLLECTION, order.id), sanitized, { merge: true }),
     setDoc(doc(db, 'orders', order.id), sanitized, { merge: true }),
+    setDoc(doc(db, 'orderan', order.id), sanitized, { merge: true }),
   ];
 
   if (dbDefault && dbDefault !== db) {
     writes.push(
       setDoc(doc(dbDefault, ORDERS_COLLECTION, order.id), sanitized, { merge: true }),
-      setDoc(doc(dbDefault, 'orders', order.id), sanitized, { merge: true })
+      setDoc(doc(dbDefault, 'orders', order.id), sanitized, { merge: true }),
+      setDoc(doc(dbDefault, 'orderan', order.id), sanitized, { merge: true })
     );
   }
 
@@ -248,12 +252,14 @@ export async function deleteOrderFromFirestore(
   const deletes: Promise<any>[] = [
     deleteDoc(doc(db, ORDERS_COLLECTION, orderId)),
     deleteDoc(doc(db, 'orders', orderId)),
+    deleteDoc(doc(db, 'orderan', orderId)),
   ];
 
   if (dbDefault && dbDefault !== db) {
     deletes.push(
       deleteDoc(doc(dbDefault, ORDERS_COLLECTION, orderId)),
-      deleteDoc(doc(dbDefault, 'orders', orderId))
+      deleteDoc(doc(dbDefault, 'orders', orderId)),
+      deleteDoc(doc(dbDefault, 'orderan', orderId))
     );
   }
 

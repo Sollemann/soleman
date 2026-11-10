@@ -41,6 +41,7 @@ import {
   SERVICES_CATALOG,
   CIREBON_AREAS,
   getServiceTierDetail,
+  calculateDistanceToWorkshop,
 } from '../data/solcreftData';
 import {
   buildGoogleMapsRouteUrl,
@@ -1053,16 +1054,20 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                       </p>
                     </div>
 
-                    {/* Koordinat / Status Sherlock Asli WA */}
+                    {/* Koordinat / Status Sherlock Asli WA & Jarak KM */}
                     {order.location.lat && order.location.lng ? (
-                      <div className="text-[11px] font-mono text-emerald-300 flex items-center justify-between bg-emerald-950/40 px-3 py-2 rounded-xl border border-emerald-500/30">
+                      <div className="text-[11px] font-mono text-emerald-300 flex items-center justify-between flex-wrap gap-1 bg-emerald-950/40 px-3 py-2 rounded-xl border border-emerald-500/30">
                         <span>
-                          🛰️ GPS: {order.location.lat.toFixed(6)},{' '}
-                          {order.location.lng.toFixed(6)}
+                          🛰️ GPS: {order.location.lat.toFixed(5)}, {order.location.lng.toFixed(5)}
                         </span>
-                        <span className="font-bold">
-                          ±{order.location.accuracy || 5}m
-                        </span>
+                        <div className="flex items-center gap-1.5 font-bold">
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-200 border border-emerald-500/30">
+                            🎯 {calculateDistanceToWorkshop(order.location.lat, order.location.lng)} KM
+                          </span>
+                          <span className="text-slate-400 font-sans text-[10px]">
+                            ±{order.location.accuracy || 5}m
+                          </span>
+                        </div>
                       </div>
                     ) : order.location.mapsUrl ? (
                       <div className="text-[11px] text-emerald-300 flex items-center justify-between bg-emerald-950/40 px-3 py-2 rounded-xl border border-emerald-500/30">
