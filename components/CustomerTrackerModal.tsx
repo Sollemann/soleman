@@ -421,9 +421,6 @@ export const CustomerTrackerModal: React.FC<CustomerTrackerModalProps> = ({
               <span className="text-[11px] font-black tracking-widest text-amber-600 uppercase">
                 TANDA TERIMA ELEKTRONIK & KARTU GARANSI
               </span>
-              <h3 className="text-xl font-black text-slate-950 tracking-tight">
-                {WORKSHOP_INFO.name.toUpperCase()}
-              </h3>
               <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
                 {WORKSHOP_INFO.address}
               </p>
