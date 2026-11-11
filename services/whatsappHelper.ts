@@ -431,26 +431,19 @@ ${serviceList}`;
       ? `🛵 *Logistik Pengantaran:* Mitra GrabExpress / Maxim Delivery & Kurir Soleman (Radius Kabupaten)`
       : `🛵 *Logistik Pengantaran:* Kurir Internal Soleman (Area Dekat / Kota Cirebon)`;
 
-  const patokanInfo = order.location.landmark
-    ? `\n🚩 *Patokan Rumah / Lokasi:* *${order.location.landmark}*`
-    : '';
-
   const locationText = order.pickupType === 'drop_off'
     ? `🏢 *Metode:* Drop-off Langsung ke Workshop Soleman (Jl. Sukalila Selatan Cirebon)`
     : `${logisticsLabel}
-📍 *Wilayah / Kecamatan:* *${order.location.areaName}* (${order.distanceZone === 'luar_cirebon' ? 'Luar Cirebon' : order.location.areaType || 'Cirebon'})${patokanInfo}
-⏰ *Jadwal Jemput:* Sesi ${order.preferredTimeSlot.toUpperCase()}
-
-📌 *SHERLOCK ASLI FITUR WHATSAPP KE KURIR:*
-*(Setelah pesan ini terkirim, saya langsung kirimkan SHERLOCK ASLI lewat fitur 📍 Lokasi bawaan WhatsApp: klik ikon 📎 Lampiran ➔ pilih 📍 Lokasi ➔ "Kirim Lokasi Anda Saat Ini / Berbagi Lokasi Terkini" tepat di bawah chat ini agar lokasi Kurir Soleman 100% akurat!)* 👇📍🛵`;
+📍 *Titik Lokasi Pelanggan:* ${order.customerName} (Kec. ${order.location.areaName})
+⏰ *Jadwal Jemput:* Sesi ${order.preferredTimeSlot.toUpperCase()}`;
 
   const photoNote = (order.photos && order.photos.length > 0) || order.photoUrl
     ? `📸 *FOTO SEPATU RUSAK:* Sudah terunggah di sistem & saya siap kirim foto tambahan ke chat ini agar admin mudah cek kondisinya.${photoConfirmText}`
     : `📸 *FOTO SEPATU RUSAK:* Saya akan kirim foto fisiknya ke chat ini untuk dicek admin Soleman.${photoConfirmText}`;
 
   const ongkirText = order.deliveryFee === 0 
-    ? (order.location.areaType === 'Kota' || order.distanceZone === 'dekat_kota' ? 'GRATIS (Khusus Seluruh Kota Cirebon)' : 'GRATIS (Promo Kab. Cirebon 2+ Pasang)')
-    : `Rp ${order.deliveryFee.toLocaleString('id-ID')} (${order.distanceZone === 'luar_cirebon' ? 'Ekspedisi J&T Express' : 'Ongkir Jarak Jauh Grab/Maxim/Kurir'})`;
+    ? 'Rp 0 (Drop-off Langsung ke Workshop)' 
+    : 'Rp 15.000 (Ongkir Flat Se-Cirebon)';
 
   const courierToken = encodeOrderForCourierLink(order);
   const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://soleman.vercel.app';

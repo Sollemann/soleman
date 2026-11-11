@@ -40,6 +40,7 @@ import {
   STATUS_LABELS,
   SERVICES_CATALOG,
   CIREBON_AREAS,
+  WORKSHOP_INFO,
   getServiceTierDetail,
   calculateDistanceToWorkshop,
 } from '../data/solcreftData';
@@ -87,9 +88,73 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
   onDeleteOrder,
 }) => {
   const [filterTab, setFilterTab] = useState<
-    'need_pickup' | 'in_transit' | 'ready_deliver' | 'cod_pending' | 'completed' | 'all'
+    'need_pickup' | 'in_transit' | 'ready_deliver' | 'cod_pending' | 'completed' | 'all' | 'optimized_route'
   >('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Mapping koordinat pusat kecamatan se-Cirebon untuk estimasi jarak akurat
+  const CIREBON_COORDINATES: Record<string, { lat: number; lng: number }> = {
+    'pekalipan': { lat: -6.7180, lng: 108.5640 },
+    'kejaksan': { lat: -6.7080, lng: 108.5580 },
+    'kesambi': { lat: -6.7260, lng: 108.5450 },
+    'lemahwungkuk': { lat: -6.7240, lng: 108.5720 },
+    'harjamukti': { lat: -6.7450, lng: 108.5520 },
+    'kedawung': { lat: -6.7150, lng: 108.5320 },
+    'weru': { lat: -6.7020, lng: 108.5080 },
+    'plered': { lat: -6.6980, lng: 108.5020 },
+    'tengah tani': { lat: -6.7050, lng: 108.5200 },
+    'sumber': { lat: -6.7620, lng: 108.4830 },
+    'gunung jati': { lat: -6.6650, lng: 108.5420 },
+    'plumbon': { lat: -6.7110, lng: 108.4680 },
+    'mundu': { lat: -6.7550, lng: 108.5950 },
+    'talun': { lat: -6.7480, lng: 108.5200 },
+    'palimanan': { lat: -6.7060, lng: 108.4230 },
+  };
+
+  const getOrderDistance = (order: Order): number => {
+    if (order.location.lat && order.location.lng) {
+      return calculateDistanceToWorkshop(order.location.lat, order.location.lng);
+    }
+    const cleanArea = (order.location.areaName || '').toLowerCase();
+    for (const [key, coords] of Object.entries(CIREBON_COORDINATES)) {
+      if (cleanArea.includes(key)) {
+        return calculateDistanceToWorkshop(coords.lat, coords.lng);
+      }
+    }
+    return 3.0;
+  };
+
+  // Titik rute berurutan dari yang terdekat dari workshop agar kurir tidak bolak-balik
+  const activeRouteStops = orders
+    .filter((o) => o.status !== 'selesai')
+    .map((o) => ({
+      order: o,
+      distanceKm: getOrderDistance(o),
+      isPickup: o.status === 'menunggu_jemput' || !o.isAcceptedByAdmin || o.status === 'perjalanan_workshop',
+    }))
+    .sort((a, b) => a.distanceKm - b.distanceKm);
+
+  const buildMultiStopRouteUrl = () => {
+    if (activeRouteStops.length === 0) return '';
+    const origin = `${WORKSHOP_INFO.lat},${WORKSHOP_INFO.lng}`;
+    const lastStop = activeRouteStops[activeRouteStops.length - 1];
+    const destination = lastStop.order.location.lat && lastStop.order.location.lng
+      ? `${lastStop.order.location.lat},${lastStop.order.location.lng}`
+      : encodeURIComponent(`${lastStop.order.location.areaName}, Cirebon`);
+
+    if (activeRouteStops.length === 1) {
+      return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    }
+
+    const waypoints = activeRouteStops.slice(0, -1).map((s) => {
+      if (s.order.location.lat && s.order.location.lng) {
+        return `${s.order.location.lat},${s.order.location.lng}`;
+      }
+      return encodeURIComponent(`${s.order.location.areaName}, Cirebon`);
+    }).join('|');
+
+    return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
+  };
 
   // Quick Inline WA Paste Bar State
   const [inlineWaInput, setInlineWaInput] = useState('');
@@ -821,6 +886,11 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
           {[
             { id: 'all', label: `Semua (${orders.length})` },
             {
+              id: 'optimized_route',
+              label: `🗺️ Optimasi Rute Jarak (${activeRouteStops.length})`,
+              highlight: activeRouteStops.length > 0,
+            },
+            {
               id: 'need_pickup',
               label: `📥 Antrean Jemput (${countNeedPickup})`,
               highlight: countNeedPickup > 0,
@@ -842,9 +912,9 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
               onClick={() => setFilterTab(tab.id as any)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 filterTab === tab.id
-                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30'
                   : tab.highlight
-                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25'
+                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -865,9 +935,127 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
         </div>
       </div>
 
-      {/* 3. DAFTAR PESANAN KURIR YANG RAPIH, AKURAT & CEPAT */}
-      <div className="space-y-4">
-        {filteredOrders.map((order) => {
+      {/* 3. DAFTAR PESANAN ATAU RUTE BERDASARKAN JARAK */}
+      {filterTab === 'optimized_route' ? (
+        <div className="space-y-4">
+          <div className="p-5 sm:p-6 rounded-3xl bg-slate-900 border border-cyan-400/40 shadow-[0_0_25px_rgba(0,240,255,0.2)] flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2">
+                <Navigation className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Rute Antar-Jemput Cerdas Berurutan</span>
+              </div>
+              <h3 className="text-xl font-black text-white">
+                Urutan Jarak Terdekat Tanpa Bolak-Balik
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Tiap titik lokasi disesuaikan dengan nama pelanggan dan diurutkan dari Workshop Sukalila Cirebon.
+              </p>
+            </div>
+
+            {activeRouteStops.length > 0 && (
+              <a
+                href={buildMultiStopRouteUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-3 px-5 rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-400/30 transition-all shrink-0 cursor-pointer"
+              >
+                <Navigation className="w-4 h-4 fill-slate-950" />
+                <span>🚀 Buka Semua Rute Sekaligus di Google Maps ({activeRouteStops.length} Titik)</span>
+              </a>
+            )}
+          </div>
+
+          {activeRouteStops.length === 0 ? (
+            <div className="text-center py-14 rounded-3xl bg-slate-900/60 border border-slate-800">
+              <CheckCircle2 className="w-10 h-10 text-cyan-400/60 mx-auto mb-2" />
+              <p className="text-slate-300 text-sm font-bold">Semua pesanan antar-jemput sudah selesai!</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeRouteStops.map((stop, idx) => {
+                const o = stop.order;
+                const singleNavUrl = o.location.lat && o.location.lng
+                  ? `https://www.google.com/maps/dir/?api=1&origin=${WORKSHOP_INFO.lat},${WORKSHOP_INFO.lng}&destination=${o.location.lat},${o.location.lng}`
+                  : `https://www.google.com/maps/dir/?api=1&origin=${WORKSHOP_INFO.lat},${WORKSHOP_INFO.lng}&destination=${encodeURIComponent(o.location.areaName + ', Cirebon')}`;
+
+                return (
+                  <div
+                    key={o.id}
+                    className="p-4 sm:p-5 rounded-2xl bg-slate-900 border border-cyan-500/30 hover:border-cyan-400/60 transition-all shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-11 h-11 rounded-2xl bg-cyan-400 text-slate-950 font-black flex items-center justify-center shrink-0 shadow-md shadow-cyan-400/30 text-sm">
+                        #{idx + 1}
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-black uppercase text-cyan-300 bg-cyan-950/80 border border-cyan-400/40 px-2.5 py-0.5 rounded-md">
+                            Titik Lokasi: {o.customerName}
+                          </span>
+                          <span className="text-xs text-slate-400 font-mono font-bold">
+                            #{o.id}
+                          </span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                            {stop.isPickup ? `📥 Jemput (${o.pairsCount} pasang)` : '📦 Antar Selesai'}
+                          </span>
+                        </div>
+
+                        <div className="text-sm font-bold text-white flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-cyan-400 shrink-0" />
+                          <span>Kecamatan {o.location.areaName}</span>
+                          <span className="text-xs font-mono text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded-md border border-cyan-500/30 font-bold">
+                            ±{stop.distanceKm} KM dari Sukalila
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-400">
+                          {o.shoeBrand} • Tagihan: <strong className="text-white">Rp {o.totalAmount.toLocaleString('id-ID')}</strong> ({o.paymentMethod.toUpperCase()})
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <a
+                        href={singleNavUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs font-black flex items-center gap-1.5 shadow-md shadow-cyan-400/30 transition-all cursor-pointer"
+                      >
+                        <Navigation className="w-3.5 h-3.5 fill-slate-950" />
+                        <span>Navigasi Maps</span>
+                      </a>
+
+                      <a
+                        href={`https://wa.me/${o.customerPhone.replace(/[^0-9]/g, '')}?text=Halo+Kak+${encodeURIComponent(o.customerName)},+saya+${encodeURIComponent(courierUser.name)}+Kurir+Soleman+Sukalila+sedang+menuju+ke+lokasi+Kakak.`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-white text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-all cursor-pointer"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Chat WA</span>
+                      </a>
+
+                      {!o.isAcceptedByAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAcceptCard(o, false)}
+                          className="px-3.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black flex items-center gap-1 transition-all cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          <span>Terima</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredOrders.map((order) => {
           const statusConfig = STATUS_LABELS[order.status];
           const isNewUnaccepted =
             !order.isAcceptedByAdmin || order.status === 'menunggu_jemput';
@@ -1634,6 +1822,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
           </div>
         )}
       </div>
+      )}
 
       {/* MODAL 1: TERIMA CEPAT PESANAN DARI CHAT WHATSAPP PELANGGAN */}
       {isReceiveWaModalOpen && (

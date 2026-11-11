@@ -13,19 +13,15 @@ import {
   getDocFromServer,
   Firestore,
 } from 'firebase/firestore';
-// ID Database Firestore Eksplisit aktif di project soleman-cirebon
-export const FIRESTORE_DATABASE_ID = 'ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528';
+import firebaseAppletConfig from './firebase-applet-config.json';
 
-// Konfigurasi resmi Firebase Soleman Cirebon tertulis langsung di dalam kode sumber
-// agar berjalan 100% normal tanpa bergantung pada env variable lokal AI Studio saat di-deploy ke Vercel (soleman.vercel.app)
+// ID Database Firestore Eksplisit aktif di project soleman-cirebon
+export const FIRESTORE_DATABASE_ID =
+  firebaseAppletConfig.firestoreDatabaseId ||
+  'ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528';
+
 export const firebaseConfig = {
-  apiKey: 'AIzaSyBXyZHxsA5M_FRgMkD1qTw_6cvX87gzzbY',
-  authDomain: 'soleman-cirebon.firebaseapp.com',
-  projectId: 'soleman-cirebon',
-  storageBucket: 'soleman-cirebon.firebasestorage.app',
-  messagingSenderId: '386040967503',
-  appId: '1:386040967503:web:7780bf3e3bb7720ebb953a',
-  measurementId: 'G-FXQB2BDTFC',
+  ...firebaseAppletConfig,
   firestoreDatabaseId: FIRESTORE_DATABASE_ID,
 };
 

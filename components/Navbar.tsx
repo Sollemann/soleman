@@ -100,14 +100,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     <>
       <header className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 transition-all">
         {/* Top bar promo & logistics info */}
-        <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 text-xs py-1.5 px-4 font-semibold">
+        <div className="bg-gradient-to-r from-cyan-500 via-sky-400 to-blue-500 text-slate-950 text-xs py-1.5 px-4 font-semibold">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="bg-slate-950 text-amber-400 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-black">
+              <span className="bg-slate-950 text-cyan-300 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-black">
                 Sukalila Cirebon
               </span>
               <span>
-                Kota Cirebon <strong className="underline">GRATIS ONGKIR</strong> • Jauh via Grab/Maxim • Luar Kota J&T Express
+                Antar-Jemput Se-Cirebon <strong className="underline">Ongkir Flat 15k</strong> • Workshop Jl. Sukalila Selatan
               </span>
             </div>
             <div className="flex items-center gap-2.5 text-xs font-medium">
@@ -118,10 +118,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     soundFx.playQrScan();
                     onOpenQrModal();
                   }}
-                  className="flex items-center gap-1 bg-slate-950/90 hover:bg-slate-950 text-sky-300 px-2 py-0.5 rounded-md font-bold transition-colors shadow-sm border border-sky-400/40 cursor-pointer"
+                  className="flex items-center gap-1 bg-slate-950/90 hover:bg-slate-950 text-cyan-300 px-2 py-0.5 rounded-md font-bold transition-colors shadow-sm border border-cyan-400/40 cursor-pointer"
                   title="Buka Kode QR DANA & Transfer Workshop Soleman"
                 >
-                  <QrCode className="w-3.5 h-3.5 text-sky-400" />
+                  <QrCode className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Kode QR DANA</span>
                 </button>
               )}
@@ -152,7 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-full border border-slate-800">
+          <nav className="hidden lg:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-full border border-cyan-500/20">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -162,7 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onClick={() => handleNavClick(item.id)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-amber-500 text-slate-950 shadow-md font-bold'
+                      ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30 font-black'
                       : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                   }`}
                 >

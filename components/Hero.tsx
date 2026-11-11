@@ -9,18 +9,13 @@ import {
   Wrench, 
   ShieldCheck, 
   MapPin, 
-  MessageSquare, 
   Search, 
   ArrowRight, 
   Sparkles,
-  CheckCircle2,
-  Clock,
-  Bot,
-  Smartphone,
-  Calculator,
-  QrCode
+  Zap,
+  QrCode,
+  Calculator
 } from 'lucide-react';
-import { WORKSHOP_INFO } from '../data/solcreftData';
 import { soundFx } from '../services/soundEffects';
 
 interface HeroProps {
@@ -39,12 +34,7 @@ export const Hero: React.FC<HeroProps> = ({
   onOpenBooking,
   onSearchOrder,
   onExploreServices,
-  onOpenDashboard,
-  onOpenWaBot,
-  onOpenInstallModal,
-  onOpenQrModal,
-  onOpenCalculator,
-  onOpenTransformasi
+  onOpenQrModal
 }) => {
   const [orderQuery, setOrderQuery] = useState('');
 
@@ -67,54 +57,54 @@ export const Hero: React.FC<HeroProps> = ({
   };
 
   return (
-    <section className="relative overflow-hidden pt-8 pb-16 lg:pt-16 lg:pb-24 border-b border-slate-800/80">
-      {/* Background radial glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-amber-500/15 via-orange-500/5 to-transparent blur-3xl pointer-events-none" />
-      <div className="absolute -top-32 right-10 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+    <section className="relative overflow-hidden pt-8 pb-14 lg:pt-14 lg:pb-20 border-b border-cyan-500/20">
+      {/* Background Ice Neon ambient glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-cyan-500/15 via-blue-500/5 to-transparent blur-3xl pointer-events-none" />
+      <div className="absolute -top-32 right-10 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
           
           {/* Left Column: Headlines & Action */}
-          <div className="lg:col-span-7 space-y-6">
+          <div className="lg:col-span-7 space-y-5">
             
             {/* Top pill badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 border border-amber-500/30 text-amber-300 text-xs font-semibold shadow-inner">
-              <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-cyan-400/30 text-cyan-300 text-xs font-semibold shadow-[0_0_12px_rgba(0,240,255,0.2)]">
+              <span className="flex h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
               <span>Workshop Sukalila Selatan Kota Cirebon</span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-300 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-amber-400" /> Antar-Jemput se-Cirebon
+                <Truck className="w-3.5 h-3.5 text-cyan-400" /> Antar-Jemput Se-Cirebon (Ongkir 15k)
               </span>
             </div>
 
             {/* Main Headline */}
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.1] font-display">
-              Sepatu Rusak & Menganga? <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-200 to-amber-500">
+              Sepatu Rusak & Mangap? <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-400 neon-glow-cyan">
                 Soleman Kembalikan
               </span> <br />
               Kuat Seperti Baru.
             </h1>
 
             {/* Subtitle */}
-            <p className="text-slate-300 text-base sm:text-lg leading-relaxed max-w-2xl">
-              Spesialis reparasi sepatu terlengkap di Cirebon: dari <strong className="text-white">sol copot / reglue press pabrik, jahit sol keliling benang tanam, resoling tapak gunung/kulit, unyellowing, hingga deep clean</strong>. <strong className="text-amber-400">Kurir Soleman</strong> jemput ke depan pintu rumah Anda dengan <strong className="text-amber-400">pembayaran fleksibel DANA, QRIS, atau COD!</strong>
+            <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl">
+              Spesialis reparasi sepatu terpercaya di Cirebon: <strong className="text-white">sol copot, jahit sol benang tanam tidak terlihat, resoling tapak trail/gunung/kulit, hingga unyellowing</strong>. Kurir siap jemput ke rumah Anda dengan <strong className="text-cyan-300">ongkir flat 15k</strong> dan bayar fleksibel via QRIS atau COD!
             </p>
 
             {/* Key Value Badges */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-medium text-slate-300">
-                <Truck className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Antar-Jemput se-Cirebon</span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/20 text-xs font-medium text-slate-200">
+                <Truck className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>Ongkir Flat 15k Se-Cirebon</span>
               </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-medium text-slate-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/20 text-xs font-medium text-slate-200">
+                <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />
                 <span>Garansi Resmi 30-90 Hari</span>
               </div>
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-medium text-slate-300 col-span-2 sm:col-span-1">
-                <QrCode className="w-4 h-4 text-sky-400 shrink-0" />
-                <span>Bayar DANA, QRIS & COD</span>
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/20 text-xs font-medium text-slate-200 col-span-2 sm:col-span-1">
+                <QrCode className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>Bayar QRIS & COD Tunai</span>
               </div>
             </div>
 
@@ -125,10 +115,10 @@ export const Hero: React.FC<HeroProps> = ({
                   soundFx.playClick();
                   onOpenBooking();
                 }}
-                className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl text-sm font-bold text-slate-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-400 shadow-xl shadow-amber-500/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-black text-slate-950 bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 hover:from-cyan-300 hover:to-sky-300 shadow-xl shadow-cyan-400/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               >
                 <Truck className="w-5 h-5 stroke-[2.3]" />
-                <span>Pesan Antar-Jemput Kurir Soleman</span>
+                <span>Pesan Antar-Jemput (Ongkir 15k)</span>
               </button>
 
               <button
@@ -136,30 +126,30 @@ export const Hero: React.FC<HeroProps> = ({
                   soundFx.playClick();
                   onExploreServices();
                 }}
-                className="flex items-center justify-center gap-2 px-6 py-4 rounded-xl text-sm font-semibold text-slate-200 bg-slate-900 hover:bg-slate-800 border border-slate-700 transition-all hover:text-white cursor-pointer"
+                className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-800 border border-cyan-500/30 hover:border-cyan-400 transition-all hover:text-white cursor-pointer"
               >
-                <Wrench className="w-4 h-4 text-amber-400" />
-                <span>Lihat Semua Jenis Kerusakan</span>
+                <Wrench className="w-4 h-4 text-cyan-400" />
+                <span>Lihat Katalog Kerusakan</span>
               </button>
             </div>
 
-            {/* Quick Feature Shortcut Pills: Transformasi + Kalkulator + QR DANA + Gemini AI */}
+            {/* Quick Feature Shortcut Pills */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => scrollToElement('transformasi')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-950/40 hover:bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 transition-all cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Galeri Sebelum/Sesudah</span>
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Foto Sebelum/Sesudah</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => scrollToElement('kalkulator')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 transition-all cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-all cursor-pointer"
               >
-                <Calculator className="w-3.5 h-3.5 text-amber-400" />
+                <Calculator className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Kalkulator Estimasi Biaya</span>
               </button>
 
@@ -170,48 +160,34 @@ export const Hero: React.FC<HeroProps> = ({
                     soundFx.playQrScan();
                     onOpenQrModal();
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-950/60 hover:bg-sky-900/60 border border-sky-500/40 text-sky-300 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-all cursor-pointer"
                 >
-                  <QrCode className="w-3.5 h-3.5 text-sky-400" />
+                  <QrCode className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Kode QR DANA Resmi</span>
-                </button>
-              )}
-
-              {onOpenWaBot && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playClick();
-                    onOpenWaBot();
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition-all cursor-pointer"
-                >
-                  <Bot className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Foto Gemini AI</span>
                 </button>
               )}
             </div>
 
             {/* Quick Order Tracker Bar */}
-            <div className="pt-2">
-              <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl max-w-lg">
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-2 font-medium">
-                  <span className="flex items-center gap-1.5 text-slate-300">
-                    <Search className="w-3.5 h-3.5 text-amber-400" /> Lacak Kode Seri Sepatu
+            <div className="pt-1">
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 shadow-lg max-w-lg">
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5 font-medium">
+                  <span className="flex items-center gap-1.5 text-slate-300 font-bold">
+                    <Search className="w-3.5 h-3.5 text-cyan-400" /> Lacak Kode Seri Sepatu Otomatis
                   </span>
-                  <span className="text-[11px] text-slate-500 font-mono">Contoh: SLC-3891</span>
+                  <span className="text-[11px] text-cyan-400/80 font-mono">Misal: SLC-3891</span>
                 </div>
                 <form onSubmit={handleSearch} className="flex gap-2">
                   <input
                     type="text"
                     value={orderQuery}
                     onChange={(e) => setOrderQuery(e.target.value)}
-                    placeholder="Masukkan Nomor Seri Sepatu (SLC-3891)..."
-                    className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    placeholder="Masukkan Nomor Seri Sepatu..."
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 shadow-inner"
                   />
                   <button
                     type="submit"
-                    className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition-all shrink-0 flex items-center gap-1 cursor-pointer"
+                    className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs rounded-xl transition-all shrink-0 flex items-center gap-1 cursor-pointer shadow-md shadow-cyan-500/30"
                   >
                     <span>Lacak</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -222,72 +198,65 @@ export const Hero: React.FC<HeroProps> = ({
 
           </div>
 
-          {/* Right Column: Interactive Highlight Card */}
+          {/* Right Column: Clean Process Card */}
           <div className="lg:col-span-5">
-            <div className="relative">
-              {/* Outer decorative card */}
-              <div className="relative rounded-3xl bg-gradient-to-b from-slate-900 to-slate-950 p-6 sm:p-8 border border-slate-800 shadow-2xl">
-                
-                {/* Header card */}
-                <div className="flex items-start justify-between pb-6 border-b border-slate-800">
+            <div className="rounded-3xl bg-slate-900/90 border border-cyan-500/30 p-6 sm:p-7 shadow-[0_0_30px_rgba(0,240,255,0.15)] space-y-4">
+              <div className="flex items-start justify-between pb-4 border-b border-slate-800">
+                <div>
+                  <span className="text-[11px] font-black text-cyan-400 uppercase tracking-widest">Workshop Soleman Cirebon</span>
+                  <h3 className="text-lg font-black text-white mt-0.5">Antar-Jemput Mudah & Praktis</h3>
+                  <p className="text-xs text-slate-400">Area Kota & Kabupaten Cirebon • Ongkir 15k</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center text-cyan-400">
+                  <Truck className="w-5 h-5" />
+                </div>
+              </div>
+
+              {/* 3 Step Process */}
+              <div className="space-y-3.5 py-1">
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-cyan-500 text-slate-950 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                    1
+                  </div>
                   <div>
-                    <span className="text-xs font-bold text-amber-400 uppercase tracking-widest">Workshop Soleman Cirebon</span>
-                    <h3 className="text-xl font-bold text-white mt-1">Layanan Antar-Jemput Prioritas</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Area Kota & Kabupaten Cirebon • Kurir Soleman</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                    <Truck className="w-6 h-6" />
+                    <h4 className="text-xs font-bold text-white">Foto & Pilih Kerusakan</h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Unggah foto sepatu, tingkat kerusakan langsung terdeteksi otomatis oleh sistem.
+                    </p>
                   </div>
                 </div>
 
-                {/* Live Process Showcase */}
-                <div className="py-6 space-y-4">
-                  <div className="flex items-start gap-3.5">
-                    <div className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                      1
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-200">Lokasi Otomatis Lewat WhatsApp</h4>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Tulis kecamatan di Cirebon, titik lokasi otomatis dishare langsung lewat fitur Share Loc WhatsApp ke Kurir Soleman tanpa repot ketik alamat atau koordinat.
-                      </p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-cyan-500 text-slate-950 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                    2
                   </div>
-
-                  <div className="flex items-start gap-3.5">
-                    <div className="w-7 h-7 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                      2
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-200">Pembayaran DANA, QRIS & COD</h4>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Bebas pilih: Scan Kode QR DANA / QRIS resmi semua bank & e-wallet atau bayar tunai COD saat sepatu diantar kembali.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3.5">
-                    <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                      3
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-200">Pengerjaan Presisi & Bergaransi</h4>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Teknisi berpengalaman, lem polyurethane pres manual, jahitan sol wax anti-lepas, dan garansi resmi hingga 90 hari.
-                      </p>
-                    </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">Kurir Jemput ke Lokasi (Ongkir 15k)</h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Pilih kecamatan di Cirebon, kurir menjemput sesuai urutan rute terdekat.
+                    </p>
                   </div>
                 </div>
 
-                {/* Workshop Quick Location Footer */}
-                <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4 text-amber-400" />
-                    <span>Jl. Sukalila Selatan, Cirebon</span>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-cyan-500 text-slate-950 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                    3
                   </div>
-                  <span className="text-emerald-400 font-bold">Buka Tiap Hari (09.00 - 21.00)</span>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">Bayar QRIS atau COD saat Selesai</h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Sepatu selesai diperbaiki dengan garansi 30-90 hari resmi workshop Sukalila.
+                    </p>
+                  </div>
                 </div>
+              </div>
 
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Jl. Sukalila Selatan, Pekalipan Cirebon</span>
+                </div>
+                <span className="text-cyan-300 font-bold">Buka Tiap Hari</span>
               </div>
             </div>
           </div>

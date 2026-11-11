@@ -200,7 +200,7 @@ Mohon diagnosis dan berikan rekomendasi menu servis resmi Soleman dalam format J
   // Mount Vite middlewares in development or serve static in production
   const distDir = path.resolve(__dirname, 'dist');
   const hasDist = fs.existsSync(distDir) && fs.existsSync(path.resolve(distDir, 'index.html'));
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = process.env.NODE_ENV !== 'production';
 
   if (!isDev && hasDist) {
     app.use(express.static(distDir));

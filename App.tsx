@@ -168,6 +168,9 @@ export const App: React.FC = () => {
       return [orderWithCustomer, ...prev];
     });
     void saveOrderToFirestore(orderWithCustomer, true, setFirebaseError);
+    // Lacak kode seri otomatis saat pelanggan order tanpa mengetik lagi
+    setTrackerQuery(orderWithCustomer.id);
+    setIsTrackerOpen(true);
   };
 
   // Handle accepting order by Admin or Courier Soleman & sync immediately to Firebase Firestore (default)
@@ -694,7 +697,7 @@ export const App: React.FC = () => {
           onSelectServiceForPickup={handleSelectServiceForPickup}
         />
 
-        {/* 5. Booking Antar-Jemput: Pisah Trail Rp 200rb & Gunung, Konfirmasi Foto WA, Jarak Logistik (Soleman/Grab/Maxim/J&T) */}
+        {/* 5. Booking Antar-Jemput: Ongkir 15k, Deteksi Kerusakan Otomatis dari Foto */}
         <PickupOrderSection
           initialServices={preselectedServices}
           initialShoeType={preselectedShoeType}
@@ -704,6 +707,10 @@ export const App: React.FC = () => {
           customerUser={customerUser}
           onOrderCreated={handleOrderCreated}
           onOpenDashboard={() => handleScrollToSection('dashboard')}
+          onOpenTrackerWithId={(id) => {
+            setTrackerQuery(id);
+            setIsTrackerOpen(true);
+          }}
         />
 
         {/* 6. DASHBOARD PELANGGAN: Pelacakan Sepatu & Berbagi Lokasi Terkini ke Kurir */}
