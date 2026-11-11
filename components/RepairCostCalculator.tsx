@@ -145,17 +145,17 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
   const activeSeverityMeta = DAMAGE_SEVERITIES.find(s => s.id === severity) || DAMAGE_SEVERITIES[1];
 
   return (
-    <section id="kalkulator" className="py-16 lg:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-cyan-500/20">
+    <section id="kalkulator" className="py-14 lg:py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-800">
       
       {/* Header */}
       <div className="text-center max-w-3xl mx-auto space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider shadow-[0_0_12px_rgba(0,240,255,0.2)]">
-          <Calculator className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Kalkulator Estimasi Biaya & Tingkat Kerusakan</span>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold">
+          <Calculator className="w-3.5 h-3.5 text-sky-400" />
+          <span>Kalkulator Estimasi Biaya Reparasi Sepatu</span>
         </div>
-        <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-display">
+        <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
           Estimasi Transparan Biaya <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-400 neon-glow-cyan">
+          <span className="text-sky-400">
             Reparasi Sepatu di Cirebon
           </span>
         </h2>

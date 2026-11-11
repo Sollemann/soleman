@@ -98,16 +98,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 transition-all">
+      <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 transition-all">
         {/* Top bar promo & logistics info */}
-        <div className="bg-gradient-to-r from-cyan-500 via-sky-400 to-blue-500 text-slate-950 text-xs py-1.5 px-4 font-semibold">
+        <div className="bg-sky-600 text-white text-xs py-1.5 px-4 font-medium">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="bg-slate-950 text-cyan-300 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-black">
+              <span className="bg-slate-950 text-white text-[10px] px-2 py-0.5 rounded uppercase tracking-wider font-bold">
                 Sukalila Cirebon
               </span>
               <span>
-                Antar-Jemput Cirebon: <strong className="underline">GRATIS ONGKIR Kota Cirebon</strong> (Kabupaten 15k) • Workshop Sukalila
+                Antar-Jemput Cirebon: <strong>GRATIS ONGKIR Kota Cirebon</strong> (Kabupaten Rp 15.000) • Workshop Sukalila
               </span>
             </div>
             <div className="flex items-center gap-2.5 text-xs font-medium">
@@ -118,10 +118,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     soundFx.playQrScan();
                     onOpenQrModal();
                   }}
-                  className="flex items-center gap-1 bg-slate-950/90 hover:bg-slate-950 text-cyan-300 px-2 py-0.5 rounded-md font-bold transition-colors shadow-sm border border-cyan-400/40 cursor-pointer"
-                  title="Buka Kode QR DANA & Transfer Workshop Soleman"
+                  className="flex items-center gap-1 bg-slate-950/90 hover:bg-slate-950 text-white px-2 py-0.5 rounded text-[11px] font-semibold transition-colors border border-sky-400/30 cursor-pointer"
+                  title="Buka Kode QR DANA Workshop Soleman"
                 >
-                  <QrCode className="w-3.5 h-3.5 text-cyan-400" />
+                  <QrCode className="w-3.5 h-3.5 text-sky-400" />
                   <span>Kode QR DANA</span>
                 </button>
               )}
@@ -129,7 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 href={`https://wa.me/${WORKSHOP_INFO.phone}`} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex hover:underline items-center gap-1 font-bold"
+                className="flex hover:underline items-center gap-1 font-semibold"
               >
                 <Phone className="w-3.5 h-3.5" /> WA: {WORKSHOP_INFO.phoneFormatted}
               </a>
@@ -138,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Main Navbar */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
           {/* Soleman Brand Logo with Hidden Staff Portal Trigger on Emblem */}
           <div 
             onClick={() => { 
@@ -152,7 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-1 bg-slate-900/60 p-1.5 rounded-full border border-cyan-500/20">
+          <nav className="hidden lg:flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -160,10 +160,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30 font-black'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                      ? 'bg-sky-600 text-white font-semibold shadow-sm'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -239,9 +239,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 soundFx.playClick();
                 onOpenBooking();
               }}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 shadow-sm transition-all cursor-pointer"
             >
-              <Truck className="w-4 h-4 stroke-[2.5]" />
+              <Truck className="w-4 h-4" />
               <span>Pesan Jemput</span>
             </button>
           </div>

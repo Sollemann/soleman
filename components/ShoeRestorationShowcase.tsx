@@ -137,18 +137,18 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
   };
 
   return (
-    <section id="transformasi" className="py-16 lg:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-cyan-500/20">
+    <section id="transformasi" className="py-14 lg:py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-800">
       
       {/* Section Header */}
       <div className="text-center max-w-3xl mx-auto space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider shadow-[0_0_12px_rgba(0,240,255,0.2)]">
-          <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold">
+          <Sparkles className="w-3.5 h-3.5 text-sky-400" />
           <span>Galeri Bukti Nyata Hasil Restorasi</span>
         </div>
-        <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-display">
+        <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
           Lihat Transformasi Sebelum & Sesudah <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-400 neon-glow-cyan">
-            Karya Craftsman Soleman Cirebon
+          <span className="text-sky-400">
+            Karya Workshop Soleman Cirebon
           </span>
         </h2>
         <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
@@ -157,20 +157,20 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
       </div>
 
       {/* Case Selector Tabs */}
-      <div className="mt-10 flex items-center justify-start sm:justify-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+      <div className="mt-8 flex items-center justify-start sm:justify-center gap-2 overflow-x-auto pb-2 scrollbar-none">
         {CASE_STUDIES.map(caseItem => {
           const isActive = caseItem.id === selectedCaseId;
           return (
             <button
               key={caseItem.id}
               onClick={() => handleSelectCase(caseItem)}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 border cursor-pointer ${
+              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 border cursor-pointer ${
                 isActive
-                  ? 'bg-gradient-to-r from-cyan-400 to-sky-400 text-slate-950 border-cyan-300 shadow-lg shadow-cyan-400/25 scale-[1.02]'
-                  : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-cyan-500/40 hover:text-white'
+                  ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
+                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
               }`}
             >
-              <Wrench className={`w-3.5 h-3.5 ${isActive ? 'text-slate-950' : 'text-cyan-400'}`} />
+              <Wrench className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
               <span>{caseItem.shoeName}</span>
             </button>
           );

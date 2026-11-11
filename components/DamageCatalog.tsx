@@ -8,12 +8,11 @@ import {
   Wrench, 
   ShieldCheck, 
   Clock, 
-  Sparkles, 
   ArrowRight, 
   Search, 
   CheckCircle2, 
-  Zap,
-  Flame
+  Flame,
+  Tag
 } from 'lucide-react';
 import { SERVICES_CATALOG } from '../data/solcreftData';
 import { DamageSeverity, ServiceItem } from '../types';
@@ -35,44 +34,44 @@ interface MenuDefinition {
 const SERVICE_MENUS: MenuDefinition[] = [
   {
     id: 'all',
-    label: 'Semua Menu',
+    label: 'Semua Layanan',
     iconText: '📋',
-    description: 'Daftar lengkap seluruh layanan reparasi sepatu & sandal workshop Soleman Cirebon',
+    description: 'Daftar lengkap 20 layanan reparasi & perawatan sepatu Soleman Sukalila Cirebon',
     categoryFilter: () => true
   },
   {
     id: 'menu-jahit',
-    label: 'Menu Jahit Sol',
+    label: 'Jahit Sol',
     iconText: '🪡',
-    description: 'Spesialisasi jahit sol keliling: benang tanam tidak kelihatan, silang X, dan zig-zag dinamis',
+    description: 'Jahit sol benang tanam rapi tidak terlihat, sulam silang X kokoh, dan zig-zag dinamis',
     categoryFilter: (s) => s.category === 'jahit'
   },
   {
     id: 'menu-tapak',
-    label: 'Menu Ganti Tapak',
+    label: 'Ganti Tapak',
     iconText: '👟',
-    description: 'Resoling tapak baru: sekolah, kantor, safety, futsal gum, trail 200k, gunung Vibram & reglue',
+    description: 'Ganti outsole baru: sepatu sekolah, pantofel kantor, safety, futsal, trail 200k, gunung Vibram & sandal',
     categoryFilter: (s) => s.category === 'sol'
   },
   {
     id: 'menu-treatment',
-    label: 'Menu Treatment & Cuci',
+    label: 'Treatment & Cuci',
     iconText: '✨',
-    description: 'Perawatan estetik: unyellowing de-oksidasi UV, repaint recolor, dan deep clean antibakteri',
+    description: 'Midsole de-oksidasi unyellowing UV, repaint recolor warna baru, dan deep clean antibakteri',
     categoryFilter: (s) => s.category === 'warna' || s.category === 'kebersihan'
   },
   {
     id: 'menu-rekonstruksi',
-    label: 'Menu Rekonstruksi & Busa',
+    label: 'Rekonstruksi & Busa',
     iconText: '🛠️',
-    description: 'Perbaikan anatomi sepatu: penggantian busa tumit robek & penambalan lubang kain kanvas/kulit',
+    description: 'Ganti busa kain tumit robek anti lecet, dan tambal patching kain upper kanvas/kulit',
     categoryFilter: (s) => s.category === 'busa' || s.category === 'kulit_upper'
   },
   {
     id: 'best',
-    label: '⭐ Paling Populer',
+    label: '⭐ Paling Sering Dipesan',
     iconText: '⭐',
-    description: 'Layanan yang paling sering dipesan oleh pelanggan setia warga Cirebon',
+    description: 'Layanan reparasi terfavorit warga Cirebon dengan tingkat kepuasan tertinggi',
     categoryFilter: (s) => Boolean(s.isBestMenu)
   }
 ];
@@ -109,37 +108,49 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
     }
   };
 
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case 'jahit': return 'Jahit Sol';
+      case 'sol': return 'Ganti Tapak';
+      case 'warna': return 'Treatment Warna';
+      case 'kebersihan': return 'Pembersihan';
+      case 'busa': return 'Rekonstruksi Busa';
+      case 'kulit_upper': return 'Patching Upper';
+      default: return 'Reparasi';
+    }
+  };
+
   return (
-    <section id="layanan" className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {/* Compact Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-cyan-500/20 pb-5">
+    <section id="layanan" className="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Header Sederhana & Bersih */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2 shadow-[0_0_12px_rgba(0,240,255,0.2)]">
-            <Zap className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-            <span>Katalog Menu Reparasi Sepatu Soleman Cirebon</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold mb-2">
+            <Tag className="w-3.5 h-3.5 text-sky-400" />
+            <span>Katalog Kerusakan & Solusi Reparasi Sepatu</span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight font-display">
-            Pilihan Menu Layanan <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-400 neon-glow-cyan">Terstruktur & Rapi</span>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            Pilih Sesuai <span className="text-sky-400">Kerusakan Sepatu Anda</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            {currentMenu.description}
+          <p className="text-sm text-slate-400 mt-1 max-w-2xl">
+            {currentMenu.description} — Foto di bawah sesuai dengan jenis kerusakan dan hasil pengerjaan di workshop kami.
           </p>
         </div>
 
         {/* Quick Search */}
-        <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400/70" />
+        <div className="relative w-full md:w-80">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari kerusakan / jenis sol..."
-            className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-950/90 border border-cyan-500/30 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all shadow-inner"
+            placeholder="Ketik masalah sepatu (misal: sol lepas, licin)..."
+            className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
           />
         </div>
       </div>
 
-      {/* Menu Categories Switcher Bar - Neatly Separated */}
+      {/* Menu Categories Switcher Bar - Sederhana, Rapih, Mudah Dipahami */}
       <div className="flex items-center gap-2 overflow-x-auto py-4 scrollbar-none">
         {SERVICE_MENUS.map((menu) => {
           const isActive = selectedMenuId === menu.id;
@@ -151,16 +162,16 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
                 soundFx.playClick();
                 setSelectedMenuId(menu.id);
               }}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 border ${
+              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 border ${
                 isActive
-                  ? 'bg-gradient-to-r from-cyan-400 to-sky-400 text-slate-950 border-cyan-300 shadow-[0_0_18px_rgba(0,240,255,0.4)] scale-102 font-black'
-                  : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-cyan-500/40 hover:text-white'
+                  ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
+                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white hover:bg-slate-800/80'
               }`}
             >
               <span>{menu.iconText}</span>
               <span>{menu.label}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                isActive ? 'bg-slate-950 text-cyan-300 font-mono' : 'bg-slate-800 text-slate-400'
+              <span className={`text-[11px] px-1.5 py-0.2 rounded-md ${
+                isActive ? 'bg-sky-700/80 text-white' : 'bg-slate-800 text-slate-400'
               }`}>
                 {count}
               </span>
@@ -169,46 +180,68 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
         })}
       </div>
 
-      {/* Services Grid - Crystal Ice Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 mt-2">
+      {/* Services Grid - Menampilkan Foto Kerusakan Masing-Masing dengan Tampilan Bersih */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-2">
         {filteredServices.map((service) => {
           const isBest = Boolean(service.isBestMenu);
           return (
             <div
               key={service.id}
               onClick={() => handleSelect(service)}
-              className={`group relative p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
-                isBest
-                  ? 'bg-gradient-to-b from-cyan-950/40 via-slate-900/90 to-slate-950 border-cyan-400/50 hover:border-cyan-300 shadow-[0_0_15px_rgba(0,240,255,0.15)] hover:shadow-[0_0_25px_rgba(0,240,255,0.35)]'
-                  : 'bg-slate-900/80 border-slate-800 hover:border-cyan-500/50 hover:bg-slate-850 hover:shadow-[0_0_15px_rgba(0,240,255,0.15)]'
-              }`}
+              className="group bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-2xl p-3.5 transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-xl hover:shadow-sky-950/20"
             >
-              {/* Header: Best Tag or Category */}
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-cyan-300 bg-cyan-950/80 border border-cyan-500/30 px-2 py-0.5 rounded-md flex items-center gap-1">
-                  {isBest && <Flame className="w-3 h-3 text-cyan-400 fill-cyan-400" />}
-                  {isBest ? 'Menu Terpopuler' : service.category === 'jahit' ? 'Jahit Sol' : service.category === 'sol' ? 'Ganti Tapak' : service.category === 'warna' ? 'Treatment' : 'Rekonstruksi'}
-                </span>
-                <span className="text-[10px] text-cyan-200/70 flex items-center gap-1 font-mono">
-                  <Clock className="w-3 h-3 text-cyan-400" /> {service.durationEst}
-                </span>
-              </div>
+              <div>
+                {/* Dedicated Damage Photo */}
+                <div className="relative w-full h-40 rounded-xl overflow-hidden mb-3 bg-slate-950 border border-slate-800">
+                  <img
+                    src={service.image}
+                    alt={service.name}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  
+                  {/* Badges Overlay */}
+                  <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-950/85 backdrop-blur-sm text-sky-300 border border-slate-700 flex items-center gap-1">
+                      {isBest && <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />}
+                      {isBest ? 'Paling Populer' : getCategoryLabel(service.category)}
+                    </span>
+                  </div>
 
-              {/* Title & Short Description */}
-              <div className="space-y-1.5 mb-3">
-                <h3 className="text-sm font-extrabold text-white group-hover:text-cyan-300 transition-colors leading-snug">
-                  {service.name}
-                </h3>
-                <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
-                  {service.damageTitle} — {service.solution}
-                </p>
+                  <div className="absolute top-2 right-2">
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-950/85 backdrop-blur-sm text-slate-300 border border-slate-700 flex items-center gap-1 font-mono">
+                      <Clock className="w-3 h-3 text-sky-400" />
+                      {service.durationEst}
+                    </span>
+                  </div>
+
+                  {/* Warranty Badge Bottom */}
+                  <div className="absolute bottom-2 left-2">
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/85 backdrop-blur-sm text-emerald-300 border border-emerald-800/80 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" /> Garansi {service.warrantyDays} Hari
+                    </span>
+                  </div>
+                </div>
+
+                {/* Service Name & Problem Definition */}
+                <div className="space-y-1.5">
+                  <h3 className="text-sm font-bold text-white group-hover:text-sky-400 transition-colors leading-snug">
+                    {service.name}
+                  </h3>
+                  <p className="text-xs text-sky-300/90 font-medium">
+                    {service.damageTitle}
+                  </p>
+                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                    {service.solution}
+                  </p>
+                </div>
               </div>
 
               {/* Price & Action Button */}
-              <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/90">
+              <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-800">
                 <div>
-                  <span className="text-[10px] text-slate-400 block">Mulai dari:</span>
-                  <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-sky-200 font-mono">
+                  <span className="text-[10px] text-slate-400 block font-medium">Biaya Reparasi:</span>
+                  <span className="text-sm font-bold text-sky-400 font-mono">
                     {service.priceFormatted}
                   </span>
                 </div>
@@ -218,10 +251,10 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
                     e.stopPropagation();
                     handleSelect(service);
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 text-slate-950 text-xs font-black flex items-center gap-1 shadow-md shadow-cyan-400/30 transition-all group-hover:translate-x-0.5 cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
                 >
                   <span>Pilih</span>
-                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -230,8 +263,17 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
       </div>
 
       {filteredServices.length === 0 && (
-        <div className="text-center py-12 bg-slate-900/40 rounded-2xl border border-slate-800">
+        <div className="text-center py-12 bg-slate-900 rounded-2xl border border-slate-800 mt-4">
           <p className="text-slate-400 text-sm">Tidak ada layanan yang sesuai pencarian "{searchQuery}".</p>
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setSelectedMenuId('all');
+            }}
+            className="mt-3 px-4 py-1.5 text-xs font-semibold text-sky-400 hover:underline cursor-pointer"
+          >
+            Tampilkan Semua Layanan
+          </button>
         </div>
       )}
     </section>
