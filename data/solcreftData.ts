@@ -55,16 +55,16 @@ export function calculateDistanceToWorkshop(
   return Math.round(distanceKm * 10) / 10; // 1 desimal, misal 2.4 KM
 }
 
-// Daftar Kecamatan Se-Cirebon (Kota & Kabupaten) - Ongkir Flat Rp 15.000 (15k)
+// Daftar Kecamatan Se-Cirebon (Gratis Ongkir Khusus Kota Cirebon, 15k Kabupaten)
 export const CIREBON_AREAS: CirebonArea[] = [
-  // KOTA CIREBON (5 KECAMATAN RESMI)
-  { name: 'Kesambi (Cipto, Sudarsono, Sunyaragi, Drajat)', type: 'Kota', deliveryFee: 15000, estimatedPickupHours: '30-45 menit' },
-  { name: 'Kejaksan (Siliwangi, Kartini, Sukapura, Kebonbaru)', type: 'Kota', deliveryFee: 15000, estimatedPickupHours: '30-45 menit' },
-  { name: 'Pekalipan (Pulasaren, Jagasatru, Pekalangan)', type: 'Kota', deliveryFee: 15000, estimatedPickupHours: '30-50 menit' },
-  { name: 'Lemahwungkuk (Kasepuhan, Pegambiran, Panjunan)', type: 'Kota', deliveryFee: 15000, estimatedPickupHours: '35-50 menit' },
-  { name: 'Harjamukti (Kalijaga, Larangan, Argasunya, Perumnas)', type: 'Kota', deliveryFee: 15000, estimatedPickupHours: '40-60 menit' },
+  // KOTA CIREBON (5 KECAMATAN RESMI) - GRATIS ONGKIR (Rp 0)
+  { name: 'Kesambi (Cipto, Sudarsono, Sunyaragi, Drajat)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '30-45 menit' },
+  { name: 'Kejaksan (Siliwangi, Kartini, Sukapura, Kebonbaru)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '30-45 menit' },
+  { name: 'Pekalipan (Pulasaren, Jagasatru, Pekalangan)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '30-50 menit' },
+  { name: 'Lemahwungkuk (Kasepuhan, Pegambiran, Panjunan)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '35-50 menit' },
+  { name: 'Harjamukti (Kalijaga, Larangan, Argasunya, Perumnas)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '40-60 menit' },
 
-  // KABUPATEN CIREBON
+  // KABUPATEN CIREBON - ONGKIR 15k
   { name: 'Kedawung / Tuparev (Kalikoa, Sutawinangun)', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '30-45 menit' },
   { name: 'Weru / Plered (Kawasan Sentra Batik Trusmi)', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '40-60 menit' },
   { name: 'Tengah Tani / Dawuan / Kemlakagede', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '40-60 menit' },
@@ -109,21 +109,21 @@ export interface DistanceZoneOption {
 export const DISTANCE_ZONES: DistanceZoneOption[] = [
   {
     id: 'dekat_kota',
-    title: 'Zona 1: Inti Kota Cirebon (< 6 KM)',
-    badge: 'Ongkir 15k',
-    rangeKm: '< 6 KM dari Workshop Sukalila Selatan',
+    title: 'Zona 1: Inti Kota Cirebon (< 6.5 KM)',
+    badge: 'Gratis Ongkir',
+    rangeKm: '< 6.5 KM dari Workshop Sukalila Selatan',
     desc: 'Pekalipan, Kejaksan, Lemahwungkuk, Kesambi, Harjamukti. Dijemput armada Kurir Soleman.',
     partner: 'kurir_soleman',
     partnerLabel: 'Kurir Internal Soleman (Motor Workshop)',
-    feeCalculation: 'Ongkir Flat Rp 15.000',
-    defaultFee: 15000
+    feeCalculation: 'GRATIS ONGKIR',
+    defaultFee: 0
   },
   {
     id: 'jauh_kabupaten',
-    title: 'Zona 2: Kabupaten Cirebon / Jarak Menengah-Jauh (> 6 KM)',
+    title: 'Zona 2: Kabupaten Cirebon (> 6.5 KM)',
     badge: 'Ongkir 15k',
-    rangeKm: '6 - 25 KM Radius Cirebon',
-    desc: 'Kedawung, Weru/Plered, Sumber, Gunung Jati, Mundu, Plumbon, Palimanan, dll. Kurir Soleman atau Mitra GrabExpress & Maxim.',
+    rangeKm: '6.5 - 25 KM Radius Cirebon',
+    desc: 'Kedawung, Weru/Plered, Sumber, Gunung Jati, Mundu, Plumbon, Palimanan, dll.',
     partner: 'grab_maxim',
     partnerLabel: 'Kurir Soleman / GrabExpress & Maxim Delivery',
     feeCalculation: 'Ongkir Flat Rp 15.000',

@@ -74,7 +74,7 @@ export const Hero: React.FC<HeroProps> = ({
               <span>Workshop Sukalila Selatan Kota Cirebon</span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-300 flex items-center gap-1">
-                <Truck className="w-3.5 h-3.5 text-cyan-400" /> Antar-Jemput Se-Cirebon (Ongkir 15k)
+                <Truck className="w-3.5 h-3.5 text-cyan-400" /> Gratis Ongkir Kota • Kabupaten 15k
               </span>
             </div>
 
@@ -89,14 +89,14 @@ export const Hero: React.FC<HeroProps> = ({
 
             {/* Subtitle */}
             <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl">
-              Spesialis reparasi sepatu terpercaya di Cirebon: <strong className="text-white">sol copot, jahit sol benang tanam tidak terlihat, resoling tapak trail/gunung/kulit, hingga unyellowing</strong>. Kurir siap jemput ke rumah Anda dengan <strong className="text-cyan-300">ongkir flat 15k</strong> dan bayar fleksibel via QRIS atau COD!
+              Spesialis reparasi sepatu terpercaya di Cirebon: <strong className="text-white">sol copot, jahit sol benang tanam tidak terlihat, resoling tapak trail/gunung/kulit, hingga unyellowing</strong>. Kurir siap jemput ke rumah Anda dengan <strong className="text-cyan-300">GRATIS ONGKIR khusus wilayah Kota Cirebon</strong> (Kabupaten 15k) dan bayar fleksibel via QRIS atau COD!
             </p>
 
             {/* Key Value Badges */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
               <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/20 text-xs font-medium text-slate-200">
                 <Truck className="w-4 h-4 text-cyan-400 shrink-0" />
-                <span>Ongkir Flat 15k Se-Cirebon</span>
+                <span>Gratis Ongkir Kota Cirebon</span>
               </div>
               <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/20 text-xs font-medium text-slate-200">
                 <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />
@@ -118,7 +118,7 @@ export const Hero: React.FC<HeroProps> = ({
                 className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-black text-slate-950 bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 hover:from-cyan-300 hover:to-sky-300 shadow-xl shadow-cyan-400/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               >
                 <Truck className="w-5 h-5 stroke-[2.3]" />
-                <span>Pesan Antar-Jemput (Ongkir 15k)</span>
+                <span>Pesan Antar-Jemput (Gratis Kota / 15k Kab.)</span>
               </button>
 
               <button
@@ -129,7 +129,7 @@ export const Hero: React.FC<HeroProps> = ({
                 className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-bold text-slate-200 bg-slate-900 hover:bg-slate-800 border border-cyan-500/30 hover:border-cyan-400 transition-all hover:text-white cursor-pointer"
               >
                 <Wrench className="w-4 h-4 text-cyan-400" />
-                <span>Lihat Katalog Kerusakan</span>
+                <span>Lihat Menu Kerusakan</span>
               </button>
             </div>
 

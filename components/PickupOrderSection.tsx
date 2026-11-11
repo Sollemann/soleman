@@ -29,6 +29,7 @@ import {
   SERVICES_CATALOG, 
   CIREBON_AREAS, 
   ALL_CIREBON_KECAMATAN_SUGGESTIONS,
+  KOTA_CIREBON_KECAMATAN,
   WORKSHOP_INFO, 
   calculateDistanceToWorkshop,
   calculateServicePrice,
@@ -75,7 +76,7 @@ interface PickupOrderSectionProps {
 }
 
 const AVAILABLE_SHOE_TYPES: { id: ShoeType; label: string }[] = [
-  { id: 'Sneakers', label: 'Sneakers (Vans, Ventela, Jordan)' },
+  { id: 'Sneakers', label: 'Sneakers (Vans, Ventela, Converse, Nike)' },
   { id: 'Sepatu Sekolah', label: 'Sepatu Sekolah (Warrior, NB)' },
   { id: 'Sepatu Kantor / Pantofel', label: 'Pantofel / Kulit Formal' },
   { id: 'Sepatu Proyek / Safety', label: 'Safety Boots / Proyek' },
@@ -150,6 +151,9 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isLocatingGps, setIsLocatingGps] = useState(false);
   const [gpsStatusMsg, setGpsStatusMsg] = useState('');
+
+  // Active Menu Tab for Service Selection (Organized by Menu Category)
+  const [activeFormMenuTab, setActiveFormMenuTab] = useState<'jahit' | 'sol' | 'treatment' | 'rekonstruksi'>('jahit');
 
   // Payment Method
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
@@ -325,8 +329,21 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
   const totalServicesPrice = shoeDetailsWithPrices.reduce((sum, s) => sum + s.price, 0);
 
-  // Delivery fee: Flat 15k for antar-jemput, Rp 0 for drop-off mandiri
-  const deliveryFee = pickupType === 'drop_off' ? 0 : 15000;
+  // Cek apakah wilayah termasuk Wilayah Kota Cirebon (Gratis Ongkir Khusus Kota)
+  const isAreaInKotaCirebon = (name: string): boolean => {
+    const lower = name.toLowerCase();
+    const isKecamatanKota = KOTA_CIREBON_KECAMATAN.some(k => lower.includes(k.toLowerCase()));
+    const matched = CIREBON_AREAS.find(a => a.name.toLowerCase() === lower);
+    return isKecamatanKota || matched?.type === 'Kota';
+  };
+
+  const isKota = isAreaInKotaCirebon(areaName);
+
+  // Aturan Ongkir:
+  // - Drop-off mandiri ke Workshop Sukalila: Rp 0
+  // - Antar-jemput Wilayah Kota Cirebon: Rp 0 (GRATIS ONGKIR)
+  // - Antar-jemput Wilayah Kabupaten Cirebon: Rp 15.000 (15k)
+  const deliveryFee = pickupType === 'drop_off' ? 0 : isKota ? 0 : 15000;
   const grandTotal = totalServicesPrice + deliveryFee;
 
   // Handle Order Submit
@@ -382,13 +399,13 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       photos: allPhotos,
       pickupType,
       preferredTimeSlot: 'siang',
-      distanceZone: 'dekat_kota',
+      distanceZone: isKota ? 'dekat_kota' : 'jauh_kabupaten',
       logisticsPartner: 'kurir_soleman',
       customerConfirmedMaterialPhoto: true,
       location: {
         areaName: cleanArea,
-        areaType: 'Kota',
-        distanceZone: 'dekat_kota',
+        areaType: isKota ? 'Kota' : 'Kabupaten',
+        distanceZone: isKota ? 'dekat_kota' : 'jauh_kabupaten',
         logisticsPartner: 'kurir_soleman',
         shareLocViaWhatsApp: true,
         fullAddress: `Kec. ${cleanArea}, Cirebon`,
@@ -668,13 +685,64 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
               )}
             </div>
 
-            {/* Services selection for this shoe */}
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold text-slate-300 block">
-                Pilih Layanan Servis untuk Sepatu #{activePairIndex + 1}:
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {SERVICES_CATALOG.slice(0, 8).map((serv) => {
+            {/* Services selection for this shoe - Neatly Organized by Category Menu */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <label className="text-[11px] font-bold text-slate-300 block">
+                  Pilih Menu Servis untuk Sepatu #{activePairIndex + 1} ({activeShoe.serviceIds.length} dipilih):
+                </label>
+                <span className="text-[10px] text-cyan-300 font-mono">
+                  Bisa pilih lebih dari 1 menu
+                </span>
+              </div>
+
+              {/* 4 Category Menu Tabs */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {[
+                  { id: 'jahit', label: '🪡 Jahit Sol', cat: (s: ServiceItem) => s.category === 'jahit' },
+                  { id: 'sol', label: '👟 Ganti Tapak', cat: (s: ServiceItem) => s.category === 'sol' },
+                  { id: 'treatment', label: '✨ Treatment', cat: (s: ServiceItem) => s.category === 'warna' || s.category === 'kebersihan' },
+                  { id: 'rekonstruksi', label: '🛠️ Busa & Upper', cat: (s: ServiceItem) => s.category === 'busa' || s.category === 'kulit_upper' },
+                ].map((menu) => {
+                  const isActive = activeFormMenuTab === menu.id;
+                  const selectedInThisMenu = SERVICES_CATALOG
+                    .filter(menu.cat)
+                    .filter(s => activeShoe.serviceIds.includes(s.id)).length;
+                  return (
+                    <button
+                      key={menu.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setActiveFormMenuTab(menu.id as any);
+                      }}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-between border ${
+                        isActive
+                          ? 'bg-gradient-to-r from-cyan-400 to-sky-400 text-slate-950 border-cyan-300 shadow-[0_0_12px_rgba(0,240,255,0.3)] font-black'
+                          : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-cyan-500/40 hover:text-white'
+                      }`}
+                    >
+                      <span className="truncate">{menu.label}</span>
+                      {selectedInThisMenu > 0 && (
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
+                          isActive ? 'bg-slate-950 text-cyan-300' : 'bg-cyan-500 text-slate-950'
+                        }`}>
+                          {selectedInThisMenu}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Services List for Active Menu Tab */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 max-h-72 overflow-y-auto pr-1">
+                {SERVICES_CATALOG.filter((s) => {
+                  if (activeFormMenuTab === 'jahit') return s.category === 'jahit';
+                  if (activeFormMenuTab === 'sol') return s.category === 'sol';
+                  if (activeFormMenuTab === 'treatment') return s.category === 'warna' || s.category === 'kebersihan';
+                  return s.category === 'busa' || s.category === 'kulit_upper';
+                }).map((serv) => {
                   const isChecked = activeShoe.serviceIds.includes(serv.id);
                   const tier = getServiceTierDetail(serv, activeShoe.severity);
                   return (
@@ -683,19 +751,21 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                       onClick={() => toggleServiceForActiveShoe(serv.id)}
                       className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all text-xs ${
                         isChecked
-                          ? 'bg-cyan-950/40 border-cyan-400/60 text-white shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                          ? 'bg-cyan-950/40 border-cyan-400 text-white shadow-[0_0_12px_rgba(0,240,255,0.2)]'
+                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <div className={`w-4 h-4 rounded-md flex items-center justify-center border ${
+                      <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
+                        <div className={`w-4 h-4 rounded-md flex items-center justify-center border shrink-0 ${
                           isChecked ? 'bg-cyan-400 border-cyan-400 text-slate-950' : 'border-slate-700'
                         }`}>
                           {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                         </div>
-                        <span className="font-semibold text-white">{serv.name}</span>
+                        <span className="font-semibold text-white truncate text-[11px] sm:text-xs">
+                          {serv.name}
+                        </span>
                       </div>
-                      <span className="font-black text-cyan-300 text-[11px]">
+                      <span className="font-black text-cyan-300 text-[11px] shrink-0 font-mono">
                         {tier.priceFormatted}
                       </span>
                     </div>
@@ -731,11 +801,15 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-white">Antar-Jemput Kurir</span>
-                <span className="text-[10px] font-black text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded-full border border-cyan-500/30">
-                  Rp 15.000
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                  isKota 
+                    ? 'text-cyan-300 bg-cyan-950 border-cyan-400/40' 
+                    : 'text-sky-300 bg-slate-900 border-sky-500/30'
+                }`}>
+                  {isKota ? 'Rp 0 (Kota)' : 'Rp 15.000 (Kab.)'}
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400">Kurir Soleman jemput ke lokasi Anda.</p>
+              <p className="text-[10px] text-slate-400">Kurir Soleman jemput ke rumah Anda.</p>
             </button>
 
             <button
@@ -752,7 +826,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-white">Drop-off Workshop</span>
-                <span className="text-[10px] font-black text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                <span className="text-[10px] font-black text-cyan-300 bg-cyan-950 px-2 py-0.5 rounded-full border border-cyan-400/40">
                   Rp 0 (Gratis)
                 </span>
               </div>
@@ -762,10 +836,10 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
           {/* Area & GPS Location Selector */}
           {pickupType === 'antar_jemput' && (
-            <div className="space-y-2 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
+            <div className="space-y-2.5 bg-slate-950/80 p-3.5 rounded-2xl border border-cyan-500/20">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-bold text-slate-300">
-                  Pilih Wilayah / Kecamatan (Kota & Kab. Cirebon):
+                  Pilih Wilayah / Kecamatan di Cirebon:
                 </label>
                 <button
                   type="button"
@@ -778,6 +852,25 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                 </button>
               </div>
 
+              {/* Dynamic Ongkir Status Banner */}
+              <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-semibold ${
+                isKota 
+                  ? 'bg-cyan-950/40 border-cyan-400/50 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
+                  : 'bg-slate-900 border-slate-800 text-slate-300'
+              }`}>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span>
+                    {isKota 
+                      ? '🎉 Khusus Wilayah Kota Cirebon: GRATIS ONGKIR!' 
+                      : '🛵 Wilayah Kabupaten Cirebon: Ongkir Rp 15.000 (15k)'}
+                  </span>
+                </div>
+                <span className="font-mono font-black text-white">
+                  {isKota ? 'Rp 0' : 'Rp 15.000'}
+                </span>
+              </div>
+
               {gpsStatusMsg && (
                 <div className="text-[10px] text-cyan-300 bg-cyan-950/30 px-2.5 py-1 rounded-lg border border-cyan-500/20">
                   {gpsStatusMsg}
@@ -787,13 +880,22 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
               <select
                 value={areaName}
                 onChange={(e) => setAreaName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none transition-colors"
               >
-                {CIREBON_AREAS.map((a) => (
-                  <option key={a.name} value={a.name}>
-                    {a.name} ({a.type}) — Ongkir 15k
-                  </option>
-                ))}
+                <optgroup label="── KOTA CIREBON (GRATIS ONGKIR Rp 0) ──">
+                  {CIREBON_AREAS.filter(a => a.type === 'Kota').map((a) => (
+                    <option key={a.name} value={a.name}>
+                      {a.name} — GRATIS ONGKIR
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="── KABUPATEN CIREBON (ONGKIR 15k) ──">
+                  {CIREBON_AREAS.filter(a => a.type === 'Kabupaten').map((a) => (
+                    <option key={a.name} value={a.name}>
+                      {a.name} — Ongkir 15k
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
           )}
@@ -843,20 +945,22 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
         {/* Order Summary & Submit Button */}
         <div className="pt-4 border-t border-slate-800 space-y-4">
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-2 text-xs">
+          <div className="p-4 rounded-2xl bg-slate-950 border border-cyan-500/20 space-y-2 text-xs shadow-inner">
             <div className="flex justify-between text-slate-400">
               <span>Total Biaya Servis ({pairsCount} pasang):</span>
-              <span className="text-white font-bold">Rp {totalServicesPrice.toLocaleString('id-ID')}</span>
+              <span className="text-white font-bold font-mono">Rp {totalServicesPrice.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Biaya Ongkir Kurir:</span>
-              <span className="text-cyan-400 font-bold">
-                {deliveryFee === 0 ? 'Rp 0 (Drop-off Workshop)' : 'Rp 15.000 (Flat Se-Cirebon)'}
+              <span className={deliveryFee === 0 ? "text-cyan-300 font-bold font-mono" : "text-cyan-400 font-bold font-mono"}>
+                {deliveryFee === 0 
+                  ? (pickupType === 'drop_off' ? 'Rp 0 (Drop-off Workshop)' : 'Rp 0 (GRATIS ONGKIR Kota Cirebon)') 
+                  : 'Rp 15.000 (Kabupaten Cirebon)'}
               </span>
             </div>
             <div className="flex justify-between text-sm font-black text-white pt-2 border-t border-slate-800">
               <span>Total Akhir:</span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-sky-200">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-sky-200 font-mono text-base">
                 Rp {grandTotal.toLocaleString('id-ID')}
               </span>
             </div>

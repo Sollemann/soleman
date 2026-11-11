@@ -40,22 +40,22 @@ interface CaseStudy {
 
 const CASE_STUDIES: CaseStudy[] = [
   {
-    id: 'aj1-reglue',
-    shoeName: 'Air Jordan 1 Retro High OG',
-    brand: 'Nike / Jordan',
-    shoeType: 'Sneakers Basket',
-    problem: 'Outsole lepas total akibat usia lem kering (delaminasi) & midsole menguning parah setelah kehujanan di jalanan Cirebon.',
-    solution: 'Pembersihan residu lem lama sampai tuntas, lem polyurethane dengan pres manual presisi, jahit sol keliling benang tanam, dan unyellowing.',
+    id: 'ventela-public',
+    shoeName: 'Ventela Public High Cut Black/Natural',
+    brand: 'Ventela',
+    shoeType: 'Sneakers Canvas & Suede',
+    problem: 'Outsole samping lepas menganga (delaminasi lem mati) & midsole kotor kusam setelah kehujanan di jalanan Cirebon.',
+    solution: 'Pembersihan tuntas residu lem lama, pengasaran pori karet, lem polyurethane formula pabrik dengan pres manual presisi, dan jahit sol benang tanam.',
     technique: 'Manual Precision Press & Invisible Insole Stitching',
     materialsUsed: ['Lem PU Daya Rekat Tinggi', 'Primer Karet Khusus', 'Benang Nilon Waxed 1.0mm', 'Oksidator Unyellowing UV'],
     duration: '2 Hari Kerja',
     warrantyDays: 60,
     estimatedPrice: 75000,
     serviceId: 'reglue-total',
-    beforeImage: 'https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=800&q=80',
-    afterImage: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?auto=format&fit=crop&w=800&q=80',
-    beforeDescription: 'Kondisi Datang: Sol menganga 100%, kotor, dan tidak bisa dipakai jalan sama sekali.',
-    afterDescription: 'Hasil Soleman: Sol merekat kokoh standar pabrikan, jahitan benang tidak kelihatan, siap diajak melompat!'
+    beforeImage: 'https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=800&q=80',
+    afterImage: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&w=800&q=80',
+    beforeDescription: 'Kondisi Datang: Sol menganga lepas di lekukan depan, kotor, dan tidak bisa dipakai jalan.',
+    afterDescription: 'Hasil Soleman: Sol merekat kokoh standar pabrikan, jahitan benang tanam rapi tidak tampak dari luar!'
   },
   {
     id: 'docmart-resoling',
@@ -137,17 +137,17 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
   };
 
   return (
-    <section id="transformasi" className="py-16 lg:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-800">
+    <section id="transformasi" className="py-16 lg:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-cyan-500/20">
       
       {/* Section Header */}
       <div className="text-center max-w-3xl mx-auto space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider">
-          <Sparkles className="w-3.5 h-3.5" />
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider shadow-[0_0_12px_rgba(0,240,255,0.2)]">
+          <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
           <span>Galeri Bukti Nyata Hasil Restorasi</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-display">
           Lihat Transformasi Sebelum & Sesudah <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-200 to-amber-500">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-400 neon-glow-cyan">
             Karya Craftsman Soleman Cirebon
           </span>
         </h2>
@@ -166,11 +166,11 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
               onClick={() => handleSelectCase(caseItem)}
               className={`px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 border cursor-pointer ${
                 isActive
-                  ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20 scale-[1.02]'
-                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
+                  ? 'bg-gradient-to-r from-cyan-400 to-sky-400 text-slate-950 border-cyan-300 shadow-lg shadow-cyan-400/25 scale-[1.02]'
+                  : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-cyan-500/40 hover:text-white'
               }`}
             >
-              <Wrench className={`w-3.5 h-3.5 ${isActive ? 'text-slate-950' : 'text-amber-400'}`} />
+              <Wrench className={`w-3.5 h-3.5 ${isActive ? 'text-slate-950' : 'text-cyan-400'}`} />
               <span>{caseItem.shoeName}</span>
             </button>
           );
@@ -178,13 +178,13 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
       </div>
 
       {/* Interactive Slider Showcase Container */}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-slate-900/60 border border-slate-800 rounded-3xl p-5 sm:p-8 shadow-2xl backdrop-blur-sm">
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-slate-900/80 border border-cyan-500/30 rounded-3xl p-5 sm:p-8 shadow-[0_0_30px_rgba(0,240,255,0.12)] backdrop-blur-md">
         
         {/* Left Column: Interactive Before/After Visual Slider (7 cols) */}
         <div className="lg:col-span-7 flex flex-col space-y-4">
           
           <div 
-            className="relative w-full h-72 sm:h-96 rounded-2xl overflow-hidden select-none cursor-ew-resize border border-slate-700 shadow-2xl group bg-slate-950"
+            className="relative w-full h-72 sm:h-96 rounded-2xl overflow-hidden select-none cursor-ew-resize border border-cyan-500/40 shadow-2xl group bg-slate-950"
             onMouseMove={(e) => {
               if (isInteracting || e.buttons === 1) {
                 const rect = e.currentTarget.getBoundingClientRect();
@@ -226,32 +226,32 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
 
             {/* Slider Dividing Bar */}
             <div 
-              className="absolute top-0 bottom-0 w-1 bg-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.8)] z-20 pointer-events-none flex items-center justify-center -translate-x-1/2"
+              className="absolute top-0 bottom-0 w-1 bg-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.9)] z-20 pointer-events-none flex items-center justify-center -translate-x-1/2"
               style={{ left: `${sliderPosition}%` }}
             >
-              <div className="w-8 h-8 rounded-full bg-slate-950 border-2 border-amber-400 flex items-center justify-center text-amber-400 shadow-xl group-hover:scale-110 transition-transform">
+              <div className="w-8 h-8 rounded-full bg-slate-950 border-2 border-cyan-400 flex items-center justify-center text-cyan-400 shadow-xl group-hover:scale-110 transition-transform">
                 <SlidersHorizontal className="w-4 h-4 stroke-[2.5]" />
               </div>
             </div>
 
             {/* Floating Badges */}
             <div className="absolute top-4 left-4 z-30 pointer-events-none">
-              <span className="px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-red-500/40 text-red-400 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg">
-                <span className="w-2 h-2 rounded-full bg-red-400" />
+              <span className="px-3 py-1 rounded-full bg-slate-950/85 backdrop-blur-md border border-rose-500/40 text-rose-400 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg">
+                <span className="w-2 h-2 rounded-full bg-rose-400" />
                 SEBELUM (RUSAK)
               </span>
             </div>
 
             <div className="absolute top-4 right-4 z-30 pointer-events-none">
-              <span className="px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-emerald-500/40 text-emerald-400 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="px-3 py-1 rounded-full bg-slate-950/85 backdrop-blur-md border border-cyan-400/50 text-cyan-300 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-cyan-400/20">
+                <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
                 SESUDAH (HASIL SOLEMAN)
               </span>
             </div>
 
             {/* Hint overlay */}
             <div className="absolute bottom-3 inset-x-0 flex justify-center z-30 pointer-events-none">
-              <span className="px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md text-[11px] text-slate-300 font-semibold border border-slate-700/80 shadow-md">
+              <span className="px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md text-[11px] text-cyan-200 font-semibold border border-cyan-500/30 shadow-md">
                 ↔ Geser ke kiri & kanan untuk membandingkan
               </span>
             </div>
@@ -259,13 +259,13 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
 
           {/* Quick comparison text bar */}
           <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="p-3 rounded-2xl bg-slate-950/80 border border-red-500/20 text-slate-300">
-              <strong className="text-red-400 block mb-1">Masalah Awal:</strong>
+            <div className="p-3 rounded-2xl bg-slate-950/80 border border-rose-500/20 text-slate-300">
+              <strong className="text-rose-400 block mb-1">Masalah Awal:</strong>
               <p className="text-[11px] leading-relaxed text-slate-400">{currentCase.beforeDescription}</p>
             </div>
-            <div className="p-3 rounded-2xl bg-slate-950/80 border border-emerald-500/20 text-slate-300">
-              <strong className="text-emerald-400 block mb-1">Hasil Restorasi:</strong>
-              <p className="text-[11px] leading-relaxed text-slate-300 font-medium">{currentCase.afterDescription}</p>
+            <div className="p-3 rounded-2xl bg-slate-950/80 border border-cyan-500/30 text-slate-300">
+              <strong className="text-cyan-400 block mb-1">Hasil Restorasi:</strong>
+              <p className="text-[11px] leading-relaxed text-slate-200 font-medium">{currentCase.afterDescription}</p>
             </div>
           </div>
 
@@ -276,10 +276,10 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
           
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-400 tracking-wider uppercase">
+              <span className="text-xs font-bold text-cyan-400 tracking-wider uppercase">
                 {currentCase.shoeType}
               </span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/30 shadow-[0_0_10px_rgba(0,240,255,0.2)]">
                 Garansi {currentCase.warrantyDays} Hari
               </span>
             </div>
@@ -294,14 +294,14 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
 
             {/* Craft Specs */}
             <div className="space-y-2.5 pt-1 text-xs">
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <span className="text-[11px] text-amber-400 font-bold block uppercase tracking-wider mb-0.5">
+              <div className="p-3 rounded-xl bg-slate-950/90 border border-cyan-500/20">
+                <span className="text-[11px] text-cyan-400 font-bold block uppercase tracking-wider mb-0.5">
                   Metode & Teknik Reparasi:
                 </span>
                 <span className="text-white font-medium">{currentCase.technique}</span>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+              <div className="p-3 rounded-xl bg-slate-950/90 border border-cyan-500/20">
                 <span className="text-[11px] text-sky-400 font-bold block uppercase tracking-wider mb-1">
                   Material Standar Pabrik:
                 </span>
@@ -316,18 +316,18 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
 
               {/* Timing & Price estimate */}
               <div className="grid grid-cols-2 gap-2 pt-1">
-                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="p-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/20 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-cyan-400 shrink-0" />
                   <div>
                     <span className="text-[10px] text-slate-400 block">Waktu Kerja</span>
                     <strong className="text-white text-xs">{currentCase.duration}</strong>
                   </div>
                 </div>
-                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-2">
+                <div className="p-2.5 rounded-xl bg-slate-950/90 border border-cyan-500/20 flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                   <div>
                     <span className="text-[10px] text-slate-400 block">Estimasi Tarif</span>
-                    <strong className="text-amber-400 text-xs">Rp {currentCase.estimatedPrice.toLocaleString('id-ID')}</strong>
+                    <strong className="text-cyan-300 text-xs">Rp {currentCase.estimatedPrice.toLocaleString('id-ID')}</strong>
                   </div>
                 </div>
               </div>
@@ -338,7 +338,7 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
           <button
             type="button"
             onClick={handleOrderThisCase}
-            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-xl shadow-amber-500/25 cursor-pointer active:scale-98"
+            className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-xl shadow-cyan-400/25 cursor-pointer active:scale-98"
           >
             <span>Pesan Servis Seperti Ini</span>
             <ArrowRight className="w-4 h-4 stroke-[2.5]" />

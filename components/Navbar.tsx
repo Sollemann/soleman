@@ -107,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 Sukalila Cirebon
               </span>
               <span>
-                Antar-Jemput Se-Cirebon <strong className="underline">Ongkir Flat 15k</strong> • Workshop Jl. Sukalila Selatan
+                Antar-Jemput Cirebon: <strong className="underline">GRATIS ONGKIR Kota Cirebon</strong> (Kabupaten 15k) • Workshop Sukalila
               </span>
             </div>
             <div className="flex items-center gap-2.5 text-xs font-medium">
