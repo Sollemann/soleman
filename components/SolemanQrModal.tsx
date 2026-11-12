@@ -94,7 +94,7 @@ export const SolemanQrModal: React.FC<SolemanQrModalProps> = ({
 
   const handleShare = async () => {
     soundFx.playClick();
-    const shareText = `Halo! Ini Kode QR Pembayaran Resmi Workshop Soleman Shoes Repair Cirebon (Sukalila Selatan - 0881-4519-955).`;
+    const shareText = `Halo! Ini Kode QR Pembayaran Resmi Soleman Shoes Repair Cirebon (0881-4519-955).`;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -356,7 +356,7 @@ export const SolemanQrModal: React.FC<SolemanQrModalProps> = ({
 
           <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Alamat: Jl. Sukalila Selatan, Kota Cirebon</span>
+            <span>Layanan Resmi Antar-Jemput Wilayah Cirebon Kota & Kabupaten</span>
           </p>
         </div>
 

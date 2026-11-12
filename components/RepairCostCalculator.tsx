@@ -321,11 +321,11 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
             
             {/* Jumlah Pasang */}
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-wider text-cyan-400">
+              <label className="text-xs font-bold uppercase tracking-wider text-sky-400">
                 4. Jumlah Sepatu:
               </label>
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4].map(num => (
+              <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
                   <button
                     key={num}
                     type="button"
@@ -333,13 +333,13 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
                       soundFx.playClick();
                       setPairsCount(num);
                     }}
-                    className={`flex-1 py-2 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                    className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                       pairsCount === num
-                        ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-[0_0_10px_rgba(0,240,255,0.3)]'
-                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                        ? 'bg-sky-500 text-slate-950 border-sky-400 font-black shadow-sm'
+                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
                     }`}
                   >
-                    {num} Pasang
+                    {num}
                   </button>
                 ))}
               </div>

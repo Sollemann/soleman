@@ -37,9 +37,9 @@ export async function onRequestPost(context: any) {
       );
     }
 
-    // Call Google Gemini API directly via fetch on Cloudflare Edge
+    // Call Google Gemini API directly via fetch on Cloudflare Edge with gemini-3.8-flash
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,19 +48,21 @@ export async function onRequestPost(context: any) {
             {
               parts: [
                 {
-                  text: `Anda adalah "Soleman AI 3.8 Engine" untuk workshop Soleman di Cirebon. Analisis keluhan/foto ini: "${prompt || 'Analisis kerusakan sepatu'}". Berikan respons JSON dengan format:
+                  text: `Anda adalah "Soleman AI 3.8 Master Vision Engine" untuk workshop Soleman di Cirebon. Analisis keluhan/foto ini: "${prompt || 'Analisis kerusakan sepatu'}". Berikan respons JSON dengan format:
 {
-  "summary": "ringkasan diagnosa",
-  "detailedExplanation": "penjelasan mendalam",
+  "summary": "ringkasan diagnosa 1-2 kalimat",
+  "detectedSeverity": "kecil" | "normal" | "hard",
+  "severityReason": "alasan penentuan tingkat keparahan",
   "detectedDamages": ["kerusakan 1", "kerusakan 2"],
-  "technicalProcedures": ["prosedur 1", "prosedur 2"],
   "recommendedServiceIds": ["jahit-benang-tersembunyi"],
+  "recommendedServiceName": "Nama Layanan",
+  "technicalProcedures": ["prosedur 1", "prosedur 2"],
   "estimatedPrice": "Rp 45.000",
   "estimatedDuration": "1 - 2 Hari Kerja",
   "warranty": "90 Hari Garansi Resmi",
   "requiresPhotoConfirmation": false,
   "photoConfirmationNote": "",
-  "proTip": "tips perawatan",
+  "proTip": "tips perawatan sepatu",
   "whatsappText": "pesan konsultasi WA"
 }`
                 }

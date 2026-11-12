@@ -39,23 +39,40 @@ export const CustomerTrackerModal: React.FC<CustomerTrackerModalProps> = ({
   const [query, setQuery] = useState(initialQuery);
   const [searchedOrder, setSearchedOrder] = useState<Order | null>(null);
 
+  // Fungsi pencocokan cerdas: ID angka, SLC-xxxx, nomor telepon, nama
+  const findMatchingOrder = (input: string, list: Order[]): Order | undefined => {
+    const clean = input.trim().toLowerCase().replace(/^#/, '');
+    if (!clean) return undefined;
+    const cleanDigits = clean.replace(/[^0-9]/g, '');
+
+    return list.find(o => {
+      const oIdLower = o.id.toLowerCase();
+      const oIdDigits = o.id.replace(/[^0-9]/g, '');
+      const phoneDigits = o.customerPhone.replace(/[^0-9]/g, '');
+      const nameLower = o.customerName.toLowerCase();
+
+      // 1. Direct or partial ID (SLC-3891 or 3891)
+      if (oIdLower === clean || oIdLower.includes(clean)) return true;
+      if (cleanDigits && oIdDigits === cleanDigits) return true;
+      // 2. Phone match
+      if (cleanDigits && cleanDigits.length >= 4 && (phoneDigits.includes(cleanDigits) || cleanDigits.includes(phoneDigits))) return true;
+      // 3. Name match
+      if (clean.length >= 3 && nameLower.includes(clean)) return true;
+      return false;
+    });
+  };
+
   // Otomatis melacak kode seri pesanan saat prop initialQuery berubah atau modal dibuka
   useEffect(() => {
     if (initialQuery.trim()) {
       setQuery(initialQuery.trim());
-      const clean = initialQuery.trim().toLowerCase();
-      const found = orders.find(o => 
-        o.id.toLowerCase() === clean || 
-        o.customerPhone.replace(/[^0-9]/g, '').includes(clean)
-      );
+      const found = findMatchingOrder(initialQuery, orders);
       if (found) {
         setSearchedOrder(found);
       } else if (orders.length > 0) {
-        // Fallback to latest order if exact match not yet in memory
         setSearchedOrder(orders[0]);
       }
     } else if (orders.length > 0 && !searchedOrder) {
-      // Default to the most recent order so user never has to type
       setSearchedOrder(orders[0]);
       setQuery(orders[0].id);
     }
@@ -66,17 +83,12 @@ export const CustomerTrackerModal: React.FC<CustomerTrackerModalProps> = ({
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     soundFx.playClick();
-    const clean = query.trim().toLowerCase();
-    if (!clean) {
+    if (!query.trim()) {
       setSearchedOrder(null);
       return;
     }
 
-    const found = orders.find(o => 
-      o.id.toLowerCase() === clean || 
-      o.customerPhone.replace(/[^0-9]/g, '') === clean.replace(/[^0-9]/g, '') ||
-      o.customerPhone.toLowerCase() === clean
-    );
+    const found = findMatchingOrder(query, orders);
     if (found) {
       soundFx.playSuccess();
     }
@@ -240,6 +252,39 @@ export const CustomerTrackerModal: React.FC<CustomerTrackerModalProps> = ({
                     Rp {searchedOrder.totalAmount.toLocaleString('id-ID')} ({searchedOrder.paymentMethod.toUpperCase()})
                   </span>
                 </div>
+              </div>
+
+              {/* Location & Action Bar */}
+              <div className="pt-2 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div className="flex items-start gap-1.5 text-slate-300">
+                  <MapPin className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[11px] text-slate-400 block">Titik Antar-Jemput:</span>
+                    <span className="text-white font-medium text-xs">
+                      {searchedOrder.location.fullAddress || searchedOrder.location.areaName}
+                    </span>
+                    {searchedOrder.location.lat && searchedOrder.location.lng && (
+                      <a
+                        href={searchedOrder.location.mapsUrl || `https://www.google.com/maps?q=${searchedOrder.location.lat},${searchedOrder.location.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-cyan-400 hover:underline block font-semibold mt-0.5"
+                      >
+                        📍 Buka di Google Maps
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <a
+                  href={`https://wa.me/62${(searchedOrder.assignedCourierPhone || '08814519955').replace(/^0/, '')}?text=${encodeURIComponent(`Halo Kurir Soleman, saya ${searchedOrder.customerName} ingin menanyakan penjemputan/pengantaran sepatu #${searchedOrder.id} di ${searchedOrder.location.areaName}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs inline-flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20 shrink-0 cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Chat Kurir WhatsApp</span>
+                </a>
               </div>
             </div>
 

@@ -67,7 +67,7 @@ export const Hero: React.FC<HeroProps> = ({
             {/* Top Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-medium text-slate-300">
               <span className="flex h-2 w-2 rounded-full bg-sky-400" />
-              <span>Workshop Sukalila Selatan, Kota Cirebon</span>
+              <span>Layanan Antar-Jemput Sepatu Se-Cirebon</span>
               <span className="text-slate-600">•</span>
               <span className="text-sky-400 font-semibold flex items-center gap-1">
                 <Truck className="w-3.5 h-3.5" /> Gratis Ongkir Kota • Kab. 15k
@@ -130,17 +130,20 @@ export const Hero: React.FC<HeroProps> = ({
             <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-400">
               <button
                 type="button"
-                onClick={() => scrollToElement('transformasi')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors cursor-pointer"
+                onClick={() => {
+                  soundFx.playClick();
+                  onExploreServices();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-700/70 text-cyan-300 transition-colors cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-                <span>Hasil Sebelum & Sesudah</span>
+                <Wrench className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Pilih Kerusakan Sepatu Anda</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => scrollToElement('kalkulator')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-700/70 text-slate-300 transition-colors cursor-pointer"
               >
                 <Calculator className="w-3.5 h-3.5 text-sky-400" />
                 <span>Kalkulator Estimasi Biaya</span>
@@ -153,7 +156,7 @@ export const Hero: React.FC<HeroProps> = ({
                     soundFx.playQrScan();
                     onOpenQrModal();
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-700/70 text-slate-300 transition-colors cursor-pointer"
                 >
                   <QrCode className="w-3.5 h-3.5 text-sky-400" />
                   <span>Kode QR DANA Resmi</span>
@@ -163,12 +166,12 @@ export const Hero: React.FC<HeroProps> = ({
 
             {/* Quick Order Tracker Bar */}
             <div className="pt-1">
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 max-w-lg">
+              <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-700/70 max-w-lg shadow-sm">
                 <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
                   <span className="flex items-center gap-1.5 text-slate-200 font-semibold">
-                    <Search className="w-3.5 h-3.5 text-sky-400" /> Lacak Status Sepatu Anda
+                    <Search className="w-3.5 h-3.5 text-cyan-400" /> Lacak Status Sepatu Anda
                   </span>
-                  <span className="text-[11px] text-slate-500 font-mono">Misal: SLC-3891</span>
+                  <span className="text-[11px] text-slate-500 font-mono">Misal: 3891 / SLC-3891</span>
                 </div>
                 <form onSubmit={handleSearch} className="flex gap-2">
                   <input
@@ -176,14 +179,14 @@ export const Hero: React.FC<HeroProps> = ({
                     value={orderQuery}
                     onChange={(e) => setOrderQuery(e.target.value)}
                     placeholder="Masukkan Nomor Seri Sepatu..."
-                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                    className="flex-1 bg-slate-950/80 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                   />
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs rounded-lg transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+                    className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold text-xs rounded-lg transition-all shrink-0 flex items-center gap-1 cursor-pointer"
                   >
                     <span>Lacak</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
                   </button>
                 </form>
               </div>
@@ -191,65 +194,91 @@ export const Hero: React.FC<HeroProps> = ({
 
           </div>
 
-          {/* Right Column: Clean & Simple Process Card */}
+          {/* Right Column: Clean Repair Solutions Showcase */}
           <div className="lg:col-span-5">
-            <div className="rounded-2xl bg-slate-900 border border-slate-800 p-6 space-y-4 shadow-sm">
-              <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+            <div className="rounded-3xl bg-slate-900/90 border border-cyan-500/25 p-6 space-y-4 shadow-xl backdrop-blur-sm">
+              <div className="flex items-start justify-between pb-3 border-b border-slate-800/80">
                 <div>
-                  <span className="text-xs font-semibold text-sky-400 uppercase tracking-wide">3 Langkah Praktis</span>
-                  <h3 className="text-base font-bold text-white mt-0.5">Cara Antar-Jemput Sepatu</h3>
-                  <p className="text-xs text-slate-400">Wilayah Cirebon Kota & Kabupaten</p>
+                  <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Spesialis Reparasi Cirebon</span>
+                  <h3 className="text-base font-extrabold text-white mt-0.5">Solusi Tuntas Kerusakan Sepatu</h3>
+                  <p className="text-xs text-slate-400">Pengerjaan rapi standar pabrik & bergaransi</p>
                 </div>
-                <div className="w-9 h-9 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
-                  <Truck className="w-4 h-4" />
-                </div>
-              </div>
-
-              {/* 3 Steps */}
-              <div className="space-y-3.5 py-1 text-xs">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-md bg-sky-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    1
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white">Unggah Foto & Pilih Layanan</h4>
-                    <p className="text-slate-400 mt-0.5 text-[11px] leading-relaxed">
-                      Kirim foto sepatu Anda, sistem kami langsung mendeteksi tingkat kerusakan secara otomatis.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-md bg-sky-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    2
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white">Kurir Menjemput Sepatu</h4>
-                    <p className="text-slate-400 mt-0.5 text-[11px] leading-relaxed">
-                      Gratis ongkir untuk 5 kecamatan Kota Cirebon, atau flat Rp 15.000 untuk wilayah Kabupaten.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-md bg-sky-600 text-white flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
-                    3
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white">Selesai, Bergaransi & Antar Kembali</h4>
-                    <p className="text-slate-400 mt-0.5 text-[11px] leading-relaxed">
-                      Sepatu kembali rapi dengan garansi resmi 30-90 hari. Pembayaran via QRIS DANA atau COD.
-                    </p>
-                  </div>
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                  <Wrench className="w-5 h-5" />
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Jl. Sukalila Selatan, Kota Cirebon</span>
+              {/* Top Service Categories */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div 
+                  onClick={() => {
+                    soundFx.playClick();
+                    onExploreServices();
+                  }}
+                  className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-cyan-500/40 transition-all cursor-pointer group"
+                >
+                  <span className="text-base block mb-1">🪡</span>
+                  <h4 className="font-bold text-white group-hover:text-cyan-300 transition-colors">Jahit Sol Tanam</h4>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Benang nilon tersembunyi, kuat & anti jebol</p>
                 </div>
-                <span className="text-emerald-400 font-medium">Buka Tiap Hari</span>
+
+                <div 
+                  onClick={() => {
+                    soundFx.playClick();
+                    onExploreServices();
+                  }}
+                  className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-cyan-500/40 transition-all cursor-pointer group"
+                >
+                  <span className="text-base block mb-1">👟</span>
+                  <h4 className="font-bold text-white group-hover:text-cyan-300 transition-colors">Ganti Tapak Sol</h4>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Outsole baru anti licin, sekolah, futsal & kantor</p>
+                </div>
+
+                <div 
+                  onClick={() => {
+                    soundFx.playClick();
+                    onExploreServices();
+                  }}
+                  className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-cyan-500/40 transition-all cursor-pointer group"
+                >
+                  <span className="text-base block mb-1">✨</span>
+                  <h4 className="font-bold text-white group-hover:text-cyan-300 transition-colors">Treatment & Cuci</h4>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Unyellowing UV, repaint warna baru & deep clean</p>
+                </div>
+
+                <div 
+                  onClick={() => {
+                    soundFx.playClick();
+                    onExploreServices();
+                  }}
+                  className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-cyan-500/40 transition-all cursor-pointer group"
+                >
+                  <span className="text-base block mb-1">🛠️</span>
+                  <h4 className="font-bold text-white group-hover:text-cyan-300 transition-colors">Rekonstruksi Busa</h4>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Busa tumit anti lecet & tambal kain upper</p>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    onExploreServices();
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500/20 to-sky-500/20 hover:from-cyan-500/30 hover:to-sky-500/30 border border-cyan-500/40 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <span>Pilih Sesuai Kerusakan Sepatu Anda di Bawah</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                <div className="flex items-center gap-1.5 text-cyan-400 font-medium">
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>Gratis Jemput Kota Cirebon</span>
+                </div>
+                <span className="text-emerald-400 font-medium">Garansi 30-90 Hari</span>
               </div>
             </div>
           </div>

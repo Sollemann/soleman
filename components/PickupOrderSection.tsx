@@ -33,7 +33,8 @@ import {
   WORKSHOP_INFO, 
   calculateDistanceToWorkshop,
   calculateServicePrice,
-  getServiceTierDetail
+  getServiceTierDetail,
+  findClosestCirebonArea
 } from '../data/solcreftData';
 import { SolemanQrModal } from './SolemanQrModal';
 import { 
@@ -61,6 +62,14 @@ interface PairFormItem {
   photoPreview?: string;
   aiDetectedSeverity?: DamageSeverity;
   aiAnalyzing?: boolean;
+  aiDiagnostics?: {
+    severity?: DamageSeverity;
+    estimatedPrice?: string;
+    proTip?: string;
+    summary?: string;
+    shoeTypeEstimated?: string;
+    technicalProcedures?: string[];
+  };
 }
 
 interface PickupOrderSectionProps {
@@ -102,6 +111,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   // Customer Info State
   const [customerName, setCustomerName] = useState(customerUser?.name || '');
   const [customerPhone, setCustomerPhone] = useState(customerUser?.phone || '');
+  const [customerAddress, setCustomerAddress] = useState(customerUser?.defaultAddress || '');
   const [pairsCount, setPairsCount] = useState<number>(initialPairsCount || 1);
   const [activePairIndex, setActivePairIndex] = useState<number>(0);
 
@@ -218,7 +228,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     updateActiveShoe({ serviceIds: nextServices });
   };
 
-  // Otomatis deteksi tingkat kerusakan sepatu dari foto pelanggan
+  // Otomatis deteksi tingkat kerusakan sepatu dari foto pelanggan via Soleman AI 3.8
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -233,7 +243,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       const dataUrl = uploadEvent.target?.result as string;
       updateActiveShoe({ photoPreview: dataUrl, aiAnalyzing: true });
 
-      // Call diagnosis endpoint in server.ts to auto-detect damage severity
+      // Call diagnosis endpoint in server.ts powered by Gemini 3.8 Flash
       try {
         const response = await fetch('/api/gemini/diagnose', {
           method: 'POST',
@@ -247,22 +257,47 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
         if (response.ok) {
           const result = await response.json();
-          // Map response to damage severity: kecil, normal, hard
           let detectedSeverity: DamageSeverity = 'normal';
-          const textToEval = JSON.stringify(result).toLowerCase();
-          if (textToEval.includes('berat') || textToEval.includes('parah') || textToEval.includes('hancur') || textToEval.includes('lepas total')) {
-            detectedSeverity = 'hard';
-          } else if (textToEval.includes('ringan') || textToEval.includes('sebagian') || textToEval.includes('sedikit')) {
-            detectedSeverity = 'kecil';
+          if (result.detectedSeverity === 'hard' || result.detectedSeverity === 'kecil' || result.detectedSeverity === 'normal') {
+            detectedSeverity = result.detectedSeverity;
           } else {
-            detectedSeverity = 'normal';
+            const textToEval = JSON.stringify(result).toLowerCase();
+            if (textToEval.includes('berat') || textToEval.includes('parah') || textToEval.includes('hancur') || textToEval.includes('lepas total')) {
+              detectedSeverity = 'hard';
+            } else if (textToEval.includes('ringan') || textToEval.includes('sebagian') || textToEval.includes('sedikit')) {
+              detectedSeverity = 'kecil';
+            } else {
+              detectedSeverity = 'normal';
+            }
           }
+
+          // Otomatis terapkan layanan rekomendasi jika AI mendeteksi servis yang cocok
+          let nextServiceIds = activeShoe.serviceIds;
+          if (Array.isArray(result.recommendedServiceIds) && result.recommendedServiceIds.length > 0) {
+            const validServices = result.recommendedServiceIds.filter((id: string) =>
+              SERVICES_CATALOG.some(s => s.id === id)
+            );
+            if (validServices.length > 0) {
+              nextServiceIds = validServices;
+            }
+          }
+
+          const notes = result.summary || (result.technicalProcedures?.length ? result.technicalProcedures.join('. ') : activeShoe.customNotes);
 
           updateActiveShoe({
             severity: detectedSeverity,
             aiDetectedSeverity: detectedSeverity,
+            serviceIds: nextServiceIds,
+            customNotes: notes,
             aiAnalyzing: false,
-            customNotes: result.summary ? `${result.summary}` : activeShoe.customNotes
+            aiDiagnostics: {
+              severity: detectedSeverity,
+              estimatedPrice: result.estimatedPrice,
+              proTip: result.proTip,
+              summary: result.summary,
+              shoeTypeEstimated: result.shoeTypeEstimated,
+              technicalProcedures: result.technicalProcedures
+            }
           });
           soundFx.playSuccess();
         } else {
@@ -278,31 +313,34 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   };
 
   const handleRemovePhoto = () => {
-    updateActiveShoe({ photoPreview: undefined, aiDetectedSeverity: undefined });
+    updateActiveShoe({ photoPreview: undefined, aiDetectedSeverity: undefined, aiDiagnostics: undefined });
   };
 
-  // Deteksi GPS Koordinat 1-Klik Cepat & Sederhana
+  // Deteksi GPS Koordinat 1-Klik Otomatis & Pemilihan Wilayah Cirebon Terdekat
   const handleDetectGps = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setGpsStatusMsg('Perangkat belum mendukung GPS otomatis.');
       return;
     }
     setIsLocatingGps(true);
-    setGpsStatusMsg('Mengunci koordinat lokasi...');
+    setGpsStatusMsg('Mengunci titik koordinat GPS akurat...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const lat = Number(pos.coords.latitude.toFixed(6));
         const lng = Number(pos.coords.longitude.toFixed(6));
         const dist = calculateDistanceToWorkshop(lat, lng);
+        const closest = findClosestCirebonArea(lat, lng);
+        setAreaName(closest.name);
         setGpsCoords({ lat, lng });
         setIsLocatingGps(false);
-        setGpsStatusMsg(`✓ Lokasi Terkunci: ${dist} KM dari Workshop Sukalila`);
+        setGpsStatusMsg(`✓ GPS Terkunci: ${closest.name} (${closest.type === 'Kota' ? 'GRATIS ONGKIR Kota' : 'Ongkir 15k Kabupaten'}) • ±${dist} KM dari Workshop Sukalila`);
+        soundFx.playSuccess();
       },
       () => {
         setIsLocatingGps(false);
-        setGpsStatusMsg('Izin GPS belum aktif di browser. Cukup pilih nama Kecamatan di bawah.');
+        setGpsStatusMsg('Izin GPS belum diizinkan. Cukup pilih nama Kecamatan Anda pada pilihan di bawah.');
       },
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 9000 }
     );
   };
 
@@ -407,9 +445,8 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
         areaType: isKota ? 'Kota' : 'Kabupaten',
         distanceZone: isKota ? 'dekat_kota' : 'jauh_kabupaten',
         logisticsPartner: 'kurir_soleman',
-        shareLocViaWhatsApp: true,
-        fullAddress: `Kec. ${cleanArea}, Cirebon`,
-        landmark: `Titik Lokasi: ${customerName.trim()} (${cleanArea})`,
+        fullAddress: customerAddress.trim() ? `${customerAddress.trim()}, Kec. ${cleanArea}, Cirebon` : `Kec. ${cleanArea}, Cirebon`,
+        landmark: customerAddress.trim() || `Titik Lokasi: ${customerName.trim()} (${cleanArea})`,
         lat: finalLat,
         lng: finalLng,
         accuracy: finalLat ? 10 : undefined,
@@ -560,9 +597,9 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             </div>
 
             {/* Pairs Count selector */}
-            <div className="flex items-center gap-2 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
-              <span className="text-[11px] text-slate-400">Jumlah:</span>
-              {[1, 2, 3, 4, 5].map((num) => (
+            <div className="flex items-center gap-1 bg-slate-950 px-2 py-1.5 rounded-xl border border-slate-800 flex-wrap">
+              <span className="text-[11px] text-slate-400 mr-1 font-semibold">Jumlah Pasang:</span>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                 <button
                   key={num}
                   type="button"
@@ -570,10 +607,10 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                     soundFx.playClick();
                     setPairsCount(num);
                   }}
-                  className={`w-7 h-7 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     pairsCount === num
-                      ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/40'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-sky-500 text-slate-950 font-black shadow-sm'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
                   }`}
                 >
                   {num}
@@ -644,32 +681,46 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
               </div>
 
               {activeShoe.photoPreview ? (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/30">
-                  <img
-                    src={activeShoe.photoPreview}
-                    alt="Preview Sepatu"
-                    className="w-16 h-16 object-cover rounded-lg border border-cyan-500/30"
-                  />
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-cyan-300">
-                        Foto Sepatu Terunggah
-                      </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold uppercase">
-                        Otomatis: {activeShoe.severity === 'hard' ? 'Berat' : activeShoe.severity === 'kecil' ? 'Ringan' : 'Sedang'}
-                      </span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/30">
+                    <img
+                      src={activeShoe.photoPreview}
+                      alt="Preview Sepatu"
+                      className="w-16 h-16 object-cover rounded-lg border border-cyan-500/30 shrink-0"
+                    />
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-black text-cyan-300">
+                          Foto Teranalisis Soleman AI 3.8
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border ${
+                          activeShoe.severity === 'hard'
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                            : activeShoe.severity === 'kecil'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                        }`}>
+                          Otomatis: {activeShoe.severity === 'hard' ? 'Kerusakan Berat' : activeShoe.severity === 'kecil' ? 'Kerusakan Ringan' : 'Kerusakan Sedang'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-300 line-clamp-2">
+                        {activeShoe.customNotes || 'Tingkat kerusakan otomatis disinkronkan ke rincian harga.'}
+                      </p>
+                      {activeShoe.aiDiagnostics?.proTip && (
+                        <p className="text-[10px] text-cyan-400 font-medium">
+                          💡 Rekomendasi AI: {activeShoe.aiDiagnostics.proTip}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-[10px] text-slate-400">
-                      Tingkat kerusakan otomatis disinkronkan ke rincian harga secara akurat.
-                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white cursor-pointer shrink-0"
+                      title="Hapus foto"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleRemovePhoto}
-                    className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
                 </div>
               ) : (
                 <label className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-cyan-500/40 hover:border-cyan-400 bg-slate-900/50 hover:bg-slate-900 cursor-pointer transition-all text-xs text-slate-300">
@@ -785,58 +836,28 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             </div>
           </div>
 
-          {/* Pickup option switcher */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                setPickupType('antar_jemput');
-              }}
-              className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                pickupType === 'antar_jemput'
-                  ? 'bg-cyan-950/40 border-cyan-400 text-white shadow-[0_0_12px_rgba(0,240,255,0.2)]'
-                  : 'bg-slate-950 border-slate-800 text-slate-400'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-white">Antar-Jemput Kurir</span>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                  isKota 
-                    ? 'text-cyan-300 bg-cyan-950 border-cyan-400/40' 
-                    : 'text-sky-300 bg-slate-900 border-sky-500/30'
-                }`}>
-                  {isKota ? 'Rp 0 (Kota)' : 'Rp 15.000 (Kab.)'}
-                </span>
+          {/* Pickup option banner: 100% Antar-Jemput Kurir */}
+          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
+                <Truck className="w-4 h-4" />
               </div>
-              <p className="text-[10px] text-slate-400">Kurir Soleman jemput ke rumah Anda.</p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                setPickupType('drop_off');
-              }}
-              className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                pickupType === 'drop_off'
-                  ? 'bg-cyan-950/40 border-cyan-400 text-white shadow-[0_0_12px_rgba(0,240,255,0.2)]'
-                  : 'bg-slate-950 border-slate-800 text-slate-400'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-white">Drop-off Workshop</span>
-                <span className="text-[10px] font-black text-cyan-300 bg-cyan-950 px-2 py-0.5 rounded-full border border-cyan-400/40">
-                  Rp 0 (Gratis)
-                </span>
+              <div>
+                <span className="text-xs font-bold text-white block">Layanan Antar-Jemput Kurir Langsung ke Rumah</span>
+                <p className="text-[11px] text-slate-400">Kurir Soleman menjemput dan mengantar sepatu langsung ke alamat Anda.</p>
               </div>
-              <p className="text-[10px] text-slate-400">Antar langsung ke Jl. Sukalila Selatan.</p>
-            </button>
+            </div>
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border shrink-0 ${
+              isKota 
+                ? 'text-sky-300 bg-sky-950/60 border-sky-500/30' 
+                : 'text-slate-300 bg-slate-950 border-slate-700'
+            }`}>
+              {isKota ? 'Gratis Ongkir (Kota Cirebon)' : 'Ongkir Rp 15.000 (Kabupaten)'}
+            </span>
           </div>
 
           {/* Area & GPS Location Selector */}
-          {pickupType === 'antar_jemput' && (
-            <div className="space-y-2.5 bg-slate-950/80 p-3.5 rounded-2xl border border-cyan-500/20">
+          <div className="space-y-2.5 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-bold text-slate-300">
                   Pilih Wilayah / Kecamatan di Cirebon:
@@ -872,8 +893,19 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
               </div>
 
               {gpsStatusMsg && (
-                <div className="text-[10px] text-cyan-300 bg-cyan-950/30 px-2.5 py-1 rounded-lg border border-cyan-500/20">
-                  {gpsStatusMsg}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[10px] text-cyan-300 bg-cyan-950/30 px-3 py-1.5 rounded-lg border border-cyan-500/20">
+                  <span>{gpsStatusMsg}</span>
+                  {gpsCoords && (
+                    <a
+                      href={`https://www.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-cyan-400 hover:text-white font-bold underline shrink-0"
+                    >
+                      <MapPin className="w-3 h-3" />
+                      <span>Buka Titik Pin Maps</span>
+                    </a>
+                  )}
                 </div>
               )}
 
@@ -897,8 +929,21 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                   ))}
                 </optgroup>
               </select>
+
+              {/* Input Alamat Lengkap & Patokan Rumah */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Alamat Lengkap / Patokan Rumah / Toko (Biar Kurir Cepat Sampai):
+                </label>
+                <input
+                  type="text"
+                  value={customerAddress}
+                  onChange={(e) => setCustomerAddress(e.target.value)}
+                  placeholder="Contoh: Jl. Sukalila No. 12 RT 02/03, pagar hitam sebelah minimarket"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none transition-colors placeholder:text-slate-600"
+                />
+              </div>
             </div>
-          )}
         </div>
 
         {/* Step 4: Payment Method */}
@@ -945,16 +990,16 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
         {/* Order Summary & Submit Button */}
         <div className="pt-4 border-t border-slate-800 space-y-4">
-          <div className="p-4 rounded-2xl bg-slate-950 border border-cyan-500/20 space-y-2 text-xs shadow-inner">
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs shadow-inner">
             <div className="flex justify-between text-slate-400">
               <span>Total Biaya Servis ({pairsCount} pasang):</span>
               <span className="text-white font-bold font-mono">Rp {totalServicesPrice.toLocaleString('id-ID')}</span>
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Biaya Ongkir Kurir:</span>
-              <span className={deliveryFee === 0 ? "text-cyan-300 font-bold font-mono" : "text-cyan-400 font-bold font-mono"}>
+              <span className={deliveryFee === 0 ? "text-sky-400 font-bold font-mono" : "text-slate-200 font-bold font-mono"}>
                 {deliveryFee === 0 
-                  ? (pickupType === 'drop_off' ? 'Rp 0 (Drop-off Workshop)' : 'Rp 0 (GRATIS ONGKIR Kota Cirebon)') 
+                  ? 'Rp 0 (GRATIS ONGKIR Kota Cirebon)' 
                   : 'Rp 15.000 (Kabupaten Cirebon)'}
               </span>
             </div>

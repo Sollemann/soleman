@@ -1027,7 +1027,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                       </a>
 
                       <a
-                        href={`https://wa.me/${o.customerPhone.replace(/[^0-9]/g, '')}?text=Halo+Kak+${encodeURIComponent(o.customerName)},+saya+${encodeURIComponent(courierUser.name)}+Kurir+Soleman+Sukalila+sedang+menuju+ke+lokasi+Kakak.`}
+                        href={`https://wa.me/${o.customerPhone.replace(/[^0-9]/g, '')}?text=Halo+Kak+${encodeURIComponent(o.customerName)},+saya+${encodeURIComponent(courierUser.name)}+Kurir+Soleman+Cirebon+sedang+menuju+ke+lokasi+Kakak.`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-white text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-all cursor-pointer"

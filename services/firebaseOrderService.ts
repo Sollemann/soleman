@@ -152,39 +152,41 @@ export function subscribeToOrdersRealtime(
   };
 
   const unsubs: (() => void)[] = [];
-  const collectionsToListen = ['oderan', 'orders', 'orderan'];
 
-  // 1. Listeners Database Utama (ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528)
-  for (const colName of collectionsToListen) {
+  // 1. Listener Database Utama (ai-studio-soleman-afbee615-a9c1-4a53-891d-a685b5451528)
+  try {
+    const unsub = onSnapshot(
+      collection(db, ORDERS_COLLECTION),
+      (snap) => handleSnapshot(snap, db, ORDERS_COLLECTION),
+      (err) => {
+        // Jika offline atau jaringan sedang menghubungkan ulang, gunakan offline cache tanpa error banner
+        if (err.code === 'unavailable' || err.message?.includes('offline') || err.message?.includes('unavailable')) {
+          onSyncStateChange?.('connected');
+          return;
+        }
+        console.warn('Firestore listener warning:', err.message);
+        onSyncStateChange?.('error');
+        onErrorChange?.(formatFirebaseErrorMessage(err, 'membaca pesanan real-time'));
+      }
+    );
+    unsubs.push(unsub);
+  } catch (e) {
+    console.warn(`Failed to attach listener for ${ORDERS_COLLECTION}:`, e);
+  }
+
+  // 2. Listener Database Default (default) untuk sinkronisasi cadangan
+  if (dbDefault && dbDefault !== db) {
     try {
       const unsub = onSnapshot(
-        collection(db, colName),
-        (snap) => handleSnapshot(snap, db, colName),
-        (err) => {
-          console.warn(`Explicit DB listener (${colName}) warning:`, err.message);
+        collection(dbDefault, ORDERS_COLLECTION),
+        (snap) => handleSnapshot(snap, dbDefault, ORDERS_COLLECTION),
+        () => {
+          // Graceful fallback
         }
       );
       unsubs.push(unsub);
     } catch (e) {
-      console.warn(`Failed to attach explicit listener for ${colName}:`, e);
-    }
-  }
-
-  // 2. Listeners Database Default (default) untuk sinkronisasi cadangan lintas HP
-  if (dbDefault && dbDefault !== db) {
-    for (const colName of collectionsToListen) {
-      try {
-        const unsub = onSnapshot(
-          collection(dbDefault, colName),
-          (snap) => handleSnapshot(snap, dbDefault, colName),
-          (err) => {
-            console.warn(`Default DB listener (${colName}) warning:`, err.message);
-          }
-        );
-        unsubs.push(unsub);
-      } catch (e) {
-        console.warn(`Failed to attach default listener for ${colName}:`, e);
-      }
+      // Ignored
     }
   }
 

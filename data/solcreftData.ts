@@ -58,31 +58,51 @@ export function calculateDistanceToWorkshop(
 // Daftar Kecamatan Se-Cirebon (Gratis Ongkir Khusus Kota Cirebon, 15k Kabupaten)
 export const CIREBON_AREAS: CirebonArea[] = [
   // KOTA CIREBON (5 KECAMATAN RESMI) - GRATIS ONGKIR (Rp 0)
-  { name: 'Kesambi (Cipto, Sudarsono, Sunyaragi, Drajat)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '30-45 menit' },
-  { name: 'Kejaksan (Siliwangi, Kartini, Sukapura, Kebonbaru)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '30-45 menit' },
-  { name: 'Pekalipan (Pulasaren, Jagasatru, Pekalangan)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '30-50 menit' },
-  { name: 'Lemahwungkuk (Kasepuhan, Pegambiran, Panjunan)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '35-50 menit' },
-  { name: 'Harjamukti (Kalijaga, Larangan, Argasunya, Perumnas)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '40-60 menit' },
+  { name: 'Kesambi (Cipto, Sudarsono, Sunyaragi, Drajat)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '30-45 menit', lat: -6.735, lng: 108.545 },
+  { name: 'Kejaksan (Siliwangi, Kartini, Sukapura, Kebonbaru)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '30-45 menit', lat: -6.705, lng: 108.555 },
+  { name: 'Pekalipan (Pulasaren, Jagasatru, Pekalangan)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '30-50 menit', lat: -6.720, lng: 108.560 },
+  { name: 'Lemahwungkuk (Kasepuhan, Pegambiran, Panjunan)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '35-50 menit', lat: -6.725, lng: 108.575 },
+  { name: 'Harjamukti (Kalijaga, Larangan, Argasunya, Perumnas)', type: 'Kota', deliveryFee: 0, estimatedPickupHours: '40-60 menit', lat: -6.755, lng: 108.550 },
 
   // KABUPATEN CIREBON - ONGKIR 15k
-  { name: 'Kedawung / Tuparev (Kalikoa, Sutawinangun)', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '30-45 menit' },
-  { name: 'Weru / Plered (Kawasan Sentra Batik Trusmi)', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '40-60 menit' },
-  { name: 'Tengah Tani / Dawuan / Kemlakagede', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '40-60 menit' },
-  { name: 'Sumber (Pusat Pemerintahan Pemkab Cirebon)', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '45-75 menit' },
-  { name: 'Gunung Jati (Klayan, Jatimerta, Astana)', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '45-75 menit' },
-  { name: 'Plumbon / Marikangen / Kasugengan', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '45-75 menit' },
-  { name: 'Mundu / Suci / Waruduwur', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '45-75 menit' },
-  { name: 'Talun / Cirebon Girang / Kepongpongan', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '40-60 menit' },
-  { name: 'Palimanan / Pegagan', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit' },
-  { name: 'Klangenan / Jemaras', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit' },
-  { name: 'Arjawinangun / Jungjang', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit' },
-  { name: 'Astanajapura / Kanci', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit' },
-  { name: 'Beber / Halimpu', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit' },
-  { name: 'Dukupuntang / Cisaat', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit' },
-  { name: 'Lemahabang / Sindanglaut', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit' },
-  { name: 'Ciledug / Jatiseeng', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit' },
-  { name: 'Losari / Panggangsari', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '70-100 menit' },
+  { name: 'Kedawung / Tuparev (Kalikoa, Sutawinangun)', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '30-45 menit', lat: -6.715, lng: 108.525 },
+  { name: 'Weru / Plered (Kawasan Sentra Batik Trusmi)', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '40-60 menit', lat: -6.710, lng: 108.490 },
+  { name: 'Tengah Tani / Dawuan / Kemlakagede', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '40-60 menit', lat: -6.712, lng: 108.510 },
+  { name: 'Sumber (Pusat Pemerintahan Pemkab Cirebon)', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '45-75 menit', lat: -6.765, lng: 108.485 },
+  { name: 'Gunung Jati (Klayan, Jatimerta, Astana)', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '45-75 menit', lat: -6.675, lng: 108.540 },
+  { name: 'Plumbon / Marikangen / Kasugengan', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '45-75 menit', lat: -6.720, lng: 108.465 },
+  { name: 'Mundu / Suci / Waruduwur', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '45-75 menit', lat: -6.755, lng: 108.610 },
+  { name: 'Talun / Cirebon Girang / Kepongpongan', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '40-60 menit', lat: -6.745, lng: 108.520 },
+  { name: 'Palimanan / Pegagan', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit', lat: -6.705, lng: 108.430 },
+  { name: 'Klangenan / Jemaras', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit', lat: -6.690, lng: 108.445 },
+  { name: 'Arjawinangun / Jungjang', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit', lat: -6.650, lng: 108.410 },
+  { name: 'Astanajapura / Kanci', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit', lat: -6.790, lng: 108.630 },
+  { name: 'Beber / Halimpu', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit', lat: -6.830, lng: 108.520 },
+  { name: 'Dukupuntang / Cisaat', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit', lat: -6.780, lng: 108.430 },
+  { name: 'Lemahabang / Sindanglaut', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit', lat: -6.830, lng: 108.620 },
+  { name: 'Ciledug / Jatiseeng', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '60-90 menit', lat: -6.880, lng: 108.740 },
+  { name: 'Losari / Panggangsari', type: 'Kabupaten', deliveryFee: 15000, estimatedPickupHours: '70-100 menit', lat: -6.840, lng: 108.800 },
 ];
+
+/**
+ * Mencari kecamatan Cirebon terdekat secara otomatis dari titik koordinat GPS pelanggan
+ */
+export function findClosestCirebonArea(lat: number, lng: number): CirebonArea {
+  let closest = CIREBON_AREAS[0];
+  let minDistance = Infinity;
+
+  for (const area of CIREBON_AREAS) {
+    if (area.lat !== undefined && area.lng !== undefined) {
+      const d = calculateDistanceToWorkshop(lat, lng, area.lat, area.lng);
+      if (d < minDistance) {
+        minDistance = d;
+        closest = area;
+      }
+    }
+  }
+
+  return closest;
+}
 
 export const ALL_CIREBON_KECAMATAN_SUGGESTIONS = [
   'Kesambi', 'Kejaksan', 'Pekalipan', 'Lemahwungkuk', 'Harjamukti',
@@ -111,10 +131,10 @@ export const DISTANCE_ZONES: DistanceZoneOption[] = [
     id: 'dekat_kota',
     title: 'Zona 1: Inti Kota Cirebon (< 6.5 KM)',
     badge: 'Gratis Ongkir',
-    rangeKm: '< 6.5 KM dari Workshop Sukalila Selatan',
+    rangeKm: 'Wilayah 5 Kecamatan Kota Cirebon',
     desc: 'Pekalipan, Kejaksan, Lemahwungkuk, Kesambi, Harjamukti. Dijemput armada Kurir Soleman.',
     partner: 'kurir_soleman',
-    partnerLabel: 'Kurir Internal Soleman (Motor Workshop)',
+    partnerLabel: 'Kurir Internal Soleman (Armada Kota Cirebon)',
     feeCalculation: 'GRATIS ONGKIR',
     defaultFee: 0
   },
@@ -122,7 +142,7 @@ export const DISTANCE_ZONES: DistanceZoneOption[] = [
     id: 'jauh_kabupaten',
     title: 'Zona 2: Kabupaten Cirebon (> 6.5 KM)',
     badge: 'Ongkir 15k',
-    rangeKm: '6.5 - 25 KM Radius Cirebon',
+    rangeKm: 'Radius Wilayah Kabupaten Cirebon',
     desc: 'Kedawung, Weru/Plered, Sumber, Gunung Jati, Mundu, Plumbon, Palimanan, dll.',
     partner: 'grab_maxim',
     partnerLabel: 'Kurir Soleman / GrabExpress & Maxim Delivery',
@@ -134,7 +154,7 @@ export const DISTANCE_ZONES: DistanceZoneOption[] = [
     title: 'Zona 3: Luar Cirebon (Antar Kota / Se-Indonesia)',
     badge: 'J&T Express 15k',
     rangeKm: 'Kuningan, Majalengka, Indramayu, Brebes, Jabodetabek, dll.',
-    desc: 'Kirim paket sepatu ke Workshop Soleman via J&T Express / JNE / SiCepat. Resi terlacak otomatis di sistem.',
+    desc: 'Kirim paket sepatu ke Soleman via J&T Express / JNE / SiCepat. Resi terlacak otomatis di sistem.',
     partner: 'jnt_express',
     partnerLabel: 'Ekspedisi J&T Express / SiCepat / JNE',
     feeCalculation: 'Ongkir J&T Rp 15.000',

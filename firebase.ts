@@ -28,9 +28,10 @@ export const firebaseConfig = {
 // Initialize Firebase App
 export const app = initializeApp(firebaseConfig);
 
-// Initialize Analytics (aman untuk semua browser)
+// Initialize Analytics hanya jika measurementId valid dan tidak kosong (mencegah NetworkError)
 export const analyticsPromise =
-  typeof window !== 'undefined'
+  typeof window !== 'undefined' &&
+  Boolean(firebaseConfig.measurementId && firebaseConfig.measurementId.trim())
     ? isSupported()
         .then((yes) => (yes ? getAnalytics(app) : null))
         .catch(() => null)

@@ -198,4 +198,6 @@ export interface CirebonArea {
   type: 'Kota' | 'Kabupaten';
   deliveryFee: number;
   estimatedPickupHours: string;
+  lat?: number;
+  lng?: number;
 }

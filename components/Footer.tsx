@@ -19,7 +19,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onStaffAccess }) => 
   };
 
   return (
-    <footer className="bg-slate-950 border-t border-slate-900 text-slate-400 text-xs">
+    <footer className="bg-slate-950/80 backdrop-blur-md border-t border-slate-800/80 text-slate-400 text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-12">
           
@@ -33,8 +33,8 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onStaffAccess }) => 
 
             <div className="pt-2 text-xs text-slate-300 space-y-1.5">
               <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <span>{WORKSHOP_INFO.address}</span>
+                <MapPin className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                <span>Layanan Antar-Jemput Sepatu Seluruh Wilayah Cirebon</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-sky-400 shrink-0" />

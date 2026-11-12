@@ -136,8 +136,8 @@ export const TestimonialsAndFaq: React.FC = () => {
       a: 'Sangat mudah! Anda cukup mengisi form di web ini, pilih bahan sepatu & upload foto, lalu kunci titik lokasi GPS rumah Anda di Cirebon. Pesanan langsung masuk ke sistem. Kurir Soleman akan meluncur sesuai titik maps tersebut untuk mengambil sepatu Anda, dan mengantarkannya kembali setelah selesai diperbaiki.'
     },
     {
-      q: 'Di mana lokasi workshop fisik Soleman jika ingin datang langsung?',
-      a: 'Workshop kami berlokasi di Jl. Sukalila Selatan, Pekalangan, Kec. Pekalipan, Kota Cirebon, Jawa Barat 45118 (Kawasan Sukalila Selatan, dekat Jl. Karanggetas & Pasar Pagi PGC Cirebon). Buka setiap hari pukul 09.00 - 21.00 WIB untuk drop-off dan konsultasi langsung.'
+      q: 'Apakah saya perlu repot datang langsung ke lokasi workshop?',
+      a: 'Tidak perlu! Soleman berfokus penuh pada kemudahan layanan antar-jemput langsung ke rumah Anda di seluruh Cirebon. Cukup isi form di website, kurir kami yang akan datang menjemput dan mengantarkan kembali sepatu Anda setelah selesai dengan Gratis Ongkir wilayah Kota Cirebon (Kabupaten flat Rp 15.000).'
     },
     {
       q: 'Apakah lem sol di Soleman tahan air dan tidak mudah lepas lagi?',

@@ -21,7 +21,6 @@ import { CustomerProfileDrawer } from './components/CustomerProfileDrawer';
 import { WaConsultationBotModal } from './components/WaConsultationBotModal';
 import { SolemanQrModal } from './components/SolemanQrModal';
 import { SolemanLogo } from './components/SolemanLogo';
-import { ShoeRestorationShowcase } from './components/ShoeRestorationShowcase';
 import { RepairCostCalculator } from './components/RepairCostCalculator';
 import { Footer } from './components/Footer';
 import { INITIAL_ORDERS, WORKSHOP_INFO, SERVICES_CATALOG } from './data/solcreftData';
@@ -487,7 +486,7 @@ export const App: React.FC = () => {
   // =========================================================================
   if (adminUser) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      <div className="min-h-screen bg-gradient-to-b from-[#0b1329] via-[#0d1c3e] to-[#081026] text-slate-100 flex flex-col font-sans">
         {renderFirebaseErrorBanner()}
         {/* Dedicated Admin Portal Header Bar */}
         <header className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-amber-500/30 px-4 py-3 shadow-xl">
@@ -555,7 +554,7 @@ export const App: React.FC = () => {
   if (courierUser) {
     const incomingPickupCount = orders.filter(o => o.status === 'menunggu_jemput' || !o.isAcceptedByAdmin).length;
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      <div className="min-h-screen bg-gradient-to-b from-[#0b1329] via-[#0d1c3e] to-[#081026] text-slate-100 flex flex-col font-sans">
         {renderFirebaseErrorBanner()}
         {/* Dedicated Courier Portal Header Bar */}
         <header className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-amber-500/30 px-4 py-3 shadow-xl">
@@ -640,7 +639,14 @@ export const App: React.FC = () => {
   // 3. TAMPILAN WEBSITE PELANGGAN (Menu Admin & Kurir Disembunyikan di Logo)
   // =========================================================================
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-gradient-to-b from-[#0b1426] via-[#0d1e3d] to-[#081126] text-slate-100 flex flex-col font-sans relative selection:bg-cyan-400 selection:text-slate-950">
+      {/* Ambient Cool Light Glows (Latar Belakang Keren Bukan Hitam Polos) */}
+      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[850px] h-[500px] bg-gradient-to-b from-cyan-500/15 via-sky-500/10 to-transparent blur-3xl rounded-full" />
+        <div className="absolute top-1/3 -left-36 w-80 h-80 bg-blue-600/10 blur-3xl rounded-full" />
+        <div className="absolute top-2/3 -right-36 w-80 h-80 bg-cyan-500/10 blur-3xl rounded-full" />
+      </div>
+
       {renderFirebaseErrorBanner()}
       {/* Navbar Pelanggan: Bersih tanpa tombol Admin/Kurir (Akses staf hanya via klik logo Soleman) */}
       <Navbar
@@ -682,9 +688,9 @@ export const App: React.FC = () => {
           onOpenQrModal={() => setIsQrModalOpen(true)}
         />
 
-        {/* 2. Interactive Before-After Transformation Gallery */}
-        <ShoeRestorationShowcase
-          onSelectService={handleSelectServiceForPickup}
+        {/* 2. PILIH SESUAI KERUSAKAN SEPATU ANDA (Dipindah ke paling atas langsung di bawah Hero) */}
+        <DamageCatalog
+          onSelectServiceForPickup={handleSelectServiceForPickup}
         />
 
         {/* 3. Instant Repair Cost & Time Calculator */}
@@ -692,12 +698,7 @@ export const App: React.FC = () => {
           onApplyEstimate={handleApplyEstimate}
         />
 
-        {/* 4. Full Damage Catalog & Repair Services (Termasuk Filter "Menu Terbaik", Jahit Sol & Ganti Tapak) */}
-        <DamageCatalog
-          onSelectServiceForPickup={handleSelectServiceForPickup}
-        />
-
-        {/* 5. Booking Antar-Jemput: Ongkir 15k, Deteksi Kerusakan Otomatis dari Foto */}
+        {/* 4. Booking Antar-Jemput: Ongkir 15k, Deteksi Kerusakan Otomatis dari Foto */}
         <PickupOrderSection
           initialServices={preselectedServices}
           initialShoeType={preselectedShoeType}
@@ -713,14 +714,14 @@ export const App: React.FC = () => {
           }}
         />
 
-        {/* 6. DASHBOARD PELANGGAN: Pelacakan Sepatu & Berbagi Lokasi Terkini ke Kurir */}
+        {/* 5. DASHBOARD PELANGGAN: Pelacakan Sepatu & Berbagi Lokasi Terkini ke Kurir */}
         <DashboardView
           orders={orders}
           onOpenBooking={() => handleScrollToSection('antar-jemput')}
           onUpdateOrderLocation={handleUpdateOrderLocation}
         />
 
-        {/* 7. Testimonials & FAQs + Write Review Form */}
+        {/* 6. Testimonials & FAQs + Write Review Form */}
         <TestimonialsAndFaq />
       </main>
 

@@ -121,31 +121,31 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
   };
 
   return (
-    <section id="layanan" className="py-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="layanan" className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header Sederhana & Bersih */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-700/60 pb-5">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold mb-2">
-            <Tag className="w-3.5 h-3.5 text-sky-400" />
-            <span>Katalog Kerusakan & Solusi Reparasi Sepatu</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 text-xs font-semibold mb-2">
+            <Tag className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Katalog Kerusakan & Solusi Reparasi Sepatu Cirebon</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Pilih Sesuai <span className="text-sky-400">Kerusakan Sepatu Anda</span>
+            Pilih Sesuai <span className="text-cyan-400">Kerusakan Sepatu Anda</span>
           </h2>
-          <p className="text-sm text-slate-400 mt-1 max-w-2xl">
-            {currentMenu.description} — Foto di bawah sesuai dengan jenis kerusakan dan hasil pengerjaan di workshop kami.
+          <p className="text-sm text-slate-300 mt-1 max-w-2xl">
+            {currentMenu.description} — Foto di bawah sesuai dengan jenis kerusakan fisik dan hasil pengerjaan rapi standar pabrik.
           </p>
         </div>
 
         {/* Quick Search */}
         <div className="relative w-full md:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Ketik masalah sepatu (misal: sol lepas, licin)..."
-            className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
+            className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl bg-slate-900/80 border border-slate-700/80 text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all shadow-inner"
           />
         </div>
       </div>
@@ -162,16 +162,16 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
                 soundFx.playClick();
                 setSelectedMenuId(menu.id);
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 border ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-2 border ${
                 isActive
-                  ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
-                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white hover:bg-slate-800/80'
+                  ? 'bg-gradient-to-r from-cyan-400 to-sky-400 text-slate-950 border-cyan-300 shadow-[0_0_15px_rgba(0,240,255,0.25)]'
+                  : 'bg-slate-900/80 text-slate-300 border-slate-700/60 hover:border-cyan-500/40 hover:text-white hover:bg-slate-800/90'
               }`}
             >
               <span>{menu.iconText}</span>
               <span>{menu.label}</span>
-              <span className={`text-[11px] px-1.5 py-0.2 rounded-md ${
-                isActive ? 'bg-sky-700/80 text-white' : 'bg-slate-800 text-slate-400'
+              <span className={`text-[11px] px-1.5 py-0.2 rounded-md font-mono ${
+                isActive ? 'bg-slate-950/80 text-cyan-300 font-bold' : 'bg-slate-800 text-slate-400'
               }`}>
                 {count}
               </span>
@@ -188,11 +188,11 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
             <div
               key={service.id}
               onClick={() => handleSelect(service)}
-              className="group bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-2xl p-3.5 transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-xl hover:shadow-sky-950/20"
+              className="group bg-slate-900/80 backdrop-blur-sm border border-slate-700/60 hover:border-cyan-400/60 rounded-2xl p-3.5 transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-xl hover:shadow-cyan-950/30 hover:-translate-y-0.5"
             >
               <div>
                 {/* Dedicated Damage Photo */}
-                <div className="relative w-full h-40 rounded-xl overflow-hidden mb-3 bg-slate-950 border border-slate-800">
+                <div className="relative w-full h-40 rounded-xl overflow-hidden mb-3 bg-slate-950/90 border border-slate-800">
                   <img
                     src={service.image}
                     alt={service.name}
@@ -202,36 +202,40 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
                   
                   {/* Badges Overlay */}
                   <div className="absolute top-2 left-2 flex flex-wrap gap-1">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-950/85 backdrop-blur-sm text-sky-300 border border-slate-700 flex items-center gap-1">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-950/85 backdrop-blur-sm text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
                       {isBest && <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />}
                       {isBest ? 'Paling Populer' : getCategoryLabel(service.category)}
                     </span>
                   </div>
 
                   <div className="absolute top-2 right-2">
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-950/85 backdrop-blur-sm text-slate-300 border border-slate-700 flex items-center gap-1 font-mono">
-                      <Clock className="w-3 h-3 text-sky-400" />
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-950/85 backdrop-blur-sm text-slate-200 border border-slate-700 flex items-center gap-1 font-mono">
+                      <Clock className="w-3 h-3 text-cyan-400" />
                       {service.durationEst}
                     </span>
                   </div>
 
                   {/* Warranty Badge Bottom */}
-                  <div className="absolute bottom-2 left-2">
-                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/85 backdrop-blur-sm text-emerald-300 border border-emerald-800/80 flex items-center gap-1">
+                  <div className="absolute bottom-2 left-2 flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/90 backdrop-blur-sm text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                       <ShieldCheck className="w-3 h-3 text-emerald-400" /> Garansi {service.warrantyDays} Hari
+                    </span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-950/90 text-rose-300 border border-rose-500/30 backdrop-blur-sm">
+                      Foto Kerusakan
                     </span>
                   </div>
                 </div>
 
                 {/* Service Name & Problem Definition */}
                 <div className="space-y-1.5">
-                  <h3 className="text-sm font-bold text-white group-hover:text-sky-400 transition-colors leading-snug">
+                  <h3 className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors leading-snug">
                     {service.name}
                   </h3>
-                  <p className="text-xs text-sky-300/90 font-medium">
-                    {service.damageTitle}
-                  </p>
-                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                  <div className="text-xs text-amber-200 font-medium flex items-start gap-1 bg-amber-950/30 p-1.5 rounded-lg border border-amber-500/25">
+                    <span className="text-amber-400 font-bold shrink-0">Gejala Rusak:</span>
+                    <span className="line-clamp-2">{service.damageTitle}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
                     {service.solution}
                   </p>
                 </div>
@@ -241,7 +245,7 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
               <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-800">
                 <div>
                   <span className="text-[10px] text-slate-400 block font-medium">Biaya Reparasi:</span>
-                  <span className="text-sm font-bold text-sky-400 font-mono">
+                  <span className="text-sm font-bold text-cyan-300 font-mono">
                     {service.priceFormatted}
                   </span>
                 </div>
@@ -251,10 +255,10 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
                     e.stopPropagation();
                     handleSelect(service);
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-md shadow-cyan-500/20"
                 >
                   <span>Pilih</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
                 </button>
               </div>
             </div>
@@ -263,14 +267,14 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
       </div>
 
       {filteredServices.length === 0 && (
-        <div className="text-center py-12 bg-slate-900 rounded-2xl border border-slate-800 mt-4">
+        <div className="text-center py-12 bg-slate-900/80 rounded-2xl border border-slate-800 mt-4">
           <p className="text-slate-400 text-sm">Tidak ada layanan yang sesuai pencarian "{searchQuery}".</p>
           <button
             onClick={() => {
               setSearchQuery('');
               setSelectedMenuId('all');
             }}
-            className="mt-3 px-4 py-1.5 text-xs font-semibold text-sky-400 hover:underline cursor-pointer"
+            className="mt-3 px-4 py-1.5 text-xs font-semibold text-cyan-400 hover:underline cursor-pointer"
           >
             Tampilkan Semua Layanan
           </button>

@@ -72,8 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [soundEnabled, setSoundEnabled] = useState(() => soundFx.isEnabled());
 
   const navItems = [
-    { id: 'layanan', label: 'Menu Servis', icon: Wrench },
-    { id: 'transformasi', label: 'Transformasi', icon: Sparkles },
+    { id: 'layanan', label: 'Pilih Kerusakan', icon: Wrench },
     { id: 'kalkulator', label: 'Kalkulator', icon: Calculator },
     { id: 'antar-jemput', label: 'Antar-Jemput', icon: Truck },
     { id: 'dashboard', label: 'Lacak Sepatu', icon: Search },
@@ -104,10 +103,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="bg-slate-950 text-white text-[10px] px-2 py-0.5 rounded uppercase tracking-wider font-bold">
-                Sukalila Cirebon
+                Soleman Cirebon
               </span>
               <span>
-                Antar-Jemput Cirebon: <strong>GRATIS ONGKIR Kota Cirebon</strong> (Kabupaten Rp 15.000) • Workshop Sukalila
+                Antar-Jemput: <strong>GRATIS ONGKIR Kota Cirebon</strong> (Kabupaten Rp 15.000) • Kurir Jemput ke Rumah
               </span>
             </div>
             <div className="flex items-center gap-2.5 text-xs font-medium">

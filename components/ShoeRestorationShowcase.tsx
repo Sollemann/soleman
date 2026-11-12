@@ -152,7 +152,7 @@ export const ShoeRestorationShowcase: React.FC<ShoeRestorationShowcaseProps> = (
           </span>
         </h2>
         <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-          Geser garis pembatas interaktif untuk melihat perbedaan sebelum diservis (rusak/mangap) dan setelah selesai direparasi di workshop Sukalila Selatan.
+          Geser garis pembatas interaktif untuk melihat perbedaan sebelum diservis (rusak/mangap) dan setelah selesai direparasi oleh tim teknisi Soleman Cirebon.
         </p>
       </div>
 
