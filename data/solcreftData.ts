@@ -184,7 +184,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sneakers', 'Sepatu Sekolah', 'Sepatu Kantor / Pantofel', 'Running / Sport', 'Sepatu Olah Raga / Sport', 'Canvas / Casual'],
     iconName: 'ShieldCheck',
     beforeAfterDescription: 'Jahitan tertanam sempurna di dalam sol, tampak bersih tanpa ada benang timbul dari samping.',
-    image: 'https://images.unsplash.com/photo-1582533561751-ef6f6ab93a2e?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_69861d22_fcf5774e.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -234,7 +234,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sneakers', 'Boots / Safety', 'Sepatu Proyek / Safety', 'Sepatu Trail', 'Sepatu Gunung / Hiking', 'Sepatu Sekolah'],
     iconName: 'Scissors',
     beforeAfterDescription: 'Pola silang X simetris presisi mengelilingi sepatu, tampil keren dan kencang maksimal.',
-    image: 'https://images.unsplash.com/photo-1516478177764-9fe5bd7e9717?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_2a2ab8d_e3293884.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -284,7 +284,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sepatu Futsal', 'Sepatu Olah Raga / Sport', 'Sepatu Bola / Cleats', 'Running / Sport', 'Sneakers'],
     iconName: 'Wrench',
     beforeAfterDescription: 'Jahitan zig-zag elastis lentur, tahan banting saat dipakai lari dan nendang bola di lapangan.',
-    image: 'https://images.unsplash.com/photo-1511556532299-8f662fc26c06?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_b406629c_62c3bee7.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -333,7 +333,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sneakers', 'Sepatu Sekolah', 'Pantofel / Formal', 'Running / Sport'],
     iconName: 'ShieldCheck',
     beforeAfterDescription: 'Jahitan rata simetris mengelilingi sepatu, tidak menusuk ke dalam telapak.',
-    image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_97f07693_c9962486.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -386,7 +386,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sepatu Sekolah', 'Canvas / Casual', 'Sneakers'],
     iconName: 'Layers',
     beforeAfterDescription: 'Tapak karet hitam baru tebal dengan grip tajam anti licin, siap dipakai sekolah setahun ke depan.',
-    image: 'https://images.unsplash.com/photo-1514989940723-e8e51635b782?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_29850b34_bc32f802.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -436,7 +436,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sepatu Kantor / Pantofel', 'Pantofel / Formal'],
     iconName: 'Award',
     beforeAfterDescription: 'Sol pantofel kembali gagah seimbang, nyaman dipakai meeting dan jalan seharian di kantor.',
-    image: 'https://images.unsplash.com/photo-1614252235316-8c857d38b5f4?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_1905198b_1__8eadd965.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -486,7 +486,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sepatu Proyek / Safety', 'Boots / Safety'],
     iconName: 'ShieldCheck',
     beforeAfterDescription: 'Tapak karet tebal bergerigi kokoh standar keselamatan kerja lapangan, tahan minyak & anti licin.',
-    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_52b7c59d_7fb83040.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -537,7 +537,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sepatu Futsal', 'Sepatu Olah Raga / Sport'],
     iconName: 'Activity',
     beforeAfterDescription: 'Tapak karet mentah baru dengan cengkeraman maksimal di lapangan, tidak meninggalkan noda hitam.',
-    image: 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_40ab46df_1__28442f53.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -587,7 +587,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sepatu Olah Raga / Sport', 'Running / Sport', 'Sneakers'],
     iconName: 'Footprints',
     beforeAfterDescription: 'Alas sol kembali empuk meredam benturan dengan traksi karet stabil di aspal & treadmill.',
-    image: 'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_6b1ca624_13ee3a5e.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -639,7 +639,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sepatu Trail'],
     iconName: 'Layers',
     beforeAfterDescription: 'Tapak karet trail baru terpasang gagah dengan konfirmasi foto bahan disetujui pelanggan via WA.',
-    image: 'https://images.unsplash.com/photo-1551107696-a4b0c5a0d9a2?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_bc96a6c3_b846a735.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -691,7 +691,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sepatu Gunung / Hiking', 'Boots / Safety'],
     iconName: 'Layers',
     beforeAfterDescription: 'Tapak gerigi dalam tajam mencengkeram medan tanah basah & bebatuan gunung dengan aman.',
-    image: 'https://images.unsplash.com/photo-1520639888713-7851133b1ed0?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_31c0edbb_1__1__e6dd279c.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -741,7 +741,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sepatu Bola / Cleats'],
     iconName: 'ShieldCheck',
     beforeAfterDescription: 'Tapak pul stud baru kokoh menancap di rumput, siap sprint dan tendangan bebas bertenaga.',
-    image: 'https://images.unsplash.com/photo-1526676037777-05a232554f77?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_5b851b89_1__ff2461cf.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -791,7 +791,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sendal Biasa'],
     iconName: 'Layers',
     beforeAfterDescription: 'Tapak sandal kembali tebal anti licin, empuk melangkah tanpa takut tergelincir.',
-    image: 'https://images.unsplash.com/photo-1603808033192-082d6919d3e1?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_a2d38a26_d64b78c1.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -841,7 +841,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sendal Kulit'],
     iconName: 'Award',
     beforeAfterDescription: 'Sandal kulit kesayangan kembali mewah dengan sol karet baru yang tahan banting dan rapi.',
-    image: 'https://images.unsplash.com/photo-1562273138-f46be4ebdf33?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_eb4eb870_25bb97cc.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -893,7 +893,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sneakers', 'Sepatu Sekolah', 'Sepatu Futsal', 'Sepatu Olah Raga / Sport', 'Sepatu Kantor / Pantofel', 'Boots / Safety'],
     iconName: 'Wrench',
     beforeAfterDescription: 'Sol yang menganga 100% kembali merekat kuat tahan banting seperti baru keluar toko.',
-    image: 'https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_51dc1279_1__99d2dc94.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -943,7 +943,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sneakers', 'Sepatu Sekolah', 'Running / Sport', 'Canvas / Casual'],
     iconName: 'Sparkles',
     beforeAfterDescription: 'Karet sol yang kuning butek kembali putih cerah alami seperti waktu beli pertama kali.',
-    image: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_efc505aa_5a161d44.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -993,7 +993,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sneakers', 'Sepatu Kantor / Pantofel', 'Boots / Safety', 'Sendal Kulit'],
     iconName: 'Palette',
     beforeAfterDescription: 'Warna kembali pekat merata, tidak kaku saat ditekuk, dan tidak luntur terkena air hujan.',
-    image: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_2143f837_c950a58d.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -1043,7 +1043,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sneakers', 'Sepatu Sekolah', 'Sepatu Kantor / Pantofel', 'Sepatu Olah Raga / Sport', 'Sendal Kulit', 'Sendal Biasa'],
     iconName: 'Droplets',
     beforeAfterDescription: 'Bersih menyeluruh sampai sudut terdalam, bebas jamur, dan harum wangi siap dipakai.',
-    image: 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_689270da_b7494486.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -1093,7 +1093,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Sneakers', 'Sepatu Sekolah', 'Sepatu Kantor / Pantofel', 'Running / Sport'],
     iconName: 'Footprints',
     beforeAfterDescription: 'Tumit kembali empuk terlapisi rapi, pas di kaki tanpa rasa sakit atau gesekan kasar.',
-    image: 'https://images.unsplash.com/photo-1539185441755-769473a23570?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/image_b374a130_2eb5343a.jpg',
     severityTiers: {
       kecil: {
         severity: 'kecil',
@@ -1143,7 +1143,7 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     suitableShoes: ['Canvas / Casual', 'Sepatu Sekolah', 'Sneakers', 'Sepatu Futsal'],
     iconName: 'Scissors',
     beforeAfterDescription: 'Lubang tertutup kuat tanpa kelihatan kembung atau tambalan murahan dari luar.',
-    image: 'https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?auto=format&fit=crop&w=800&q=80',
+    image: '/assets/aistudio/p_e2271545.jpeg',
     severityTiers: {
       kecil: {
         severity: 'kecil',

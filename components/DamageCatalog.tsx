@@ -192,23 +192,23 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
             >
               <div>
                 {/* Dedicated Damage Photo */}
-                <div className="relative w-full h-40 rounded-xl overflow-hidden mb-3 bg-slate-950/90 border border-slate-800">
+                <div className="relative w-full h-48 rounded-xl overflow-hidden mb-3 bg-slate-950/95 border border-slate-800/90 flex items-center justify-center">
                   <img
                     src={service.image}
                     alt={service.name}
                     loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                   />
                   
                   {/* Badges Overlay */}
-                  <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+                  <div className="absolute top-1.5 left-1.5 flex flex-wrap gap-1">
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-950/85 backdrop-blur-sm text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
                       {isBest && <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />}
                       {isBest ? 'Paling Populer' : getCategoryLabel(service.category)}
                     </span>
                   </div>
 
-                  <div className="absolute top-2 right-2">
+                  <div className="absolute top-1.5 right-1.5">
                     <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-950/85 backdrop-blur-sm text-slate-200 border border-slate-700 flex items-center gap-1 font-mono">
                       <Clock className="w-3 h-3 text-cyan-400" />
                       {service.durationEst}
@@ -216,12 +216,9 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
                   </div>
 
                   {/* Warranty Badge Bottom */}
-                  <div className="absolute bottom-2 left-2 flex items-center gap-1.5 flex-wrap">
+                  <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 flex-wrap">
                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/90 backdrop-blur-sm text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                       <ShieldCheck className="w-3 h-3 text-emerald-400" /> Garansi {service.warrantyDays} Hari
-                    </span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-950/90 text-rose-300 border border-rose-500/30 backdrop-blur-sm">
-                      Foto Kerusakan
                     </span>
                   </div>
                 </div>
