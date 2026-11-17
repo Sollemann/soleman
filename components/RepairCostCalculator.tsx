@@ -100,7 +100,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
     const subtotalServices = baseServicePrice * pairsCount;
     const deliveryFee = 0;
     const isFreeDelivery = true;
-    const deliveryNote = 'Gratis Ongkir se-Kota Cirebon (Kabupaten Rp 15.000) — otomatis terdeteksi saat Bagikan Lokasi';
+    const deliveryNote = 'Gratis Ongkir se-Kota Cirebon (Kabupaten Rp 15.000) — Share-Loc dikirim via WhatsApp Kurir';
     const totalEstimate = subtotalServices + deliveryFee;
 
     let maxDays = severity === 'hard' ? 3 : 2;
@@ -431,7 +431,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
             </div>
             <h3 className="text-xl font-bold text-white">Ringkasan Kerusakan & Biaya</h3>
             <p className="text-xs text-slate-400">
-              Untuk {pairsCount} pasang {shoeType}{needsShoeSize ? ` (Ukuran EU ${shoeSize})` : ''} • Ongkir otomatis via Bagikan Lokasi
+              Untuk {pairsCount} pasang {shoeType}{needsShoeSize ? ` (Ukuran EU ${shoeSize})` : ''} • Share-Loc via WhatsApp Kurir
             </p>
           </div>
 

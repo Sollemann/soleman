@@ -443,13 +443,14 @@ ${serviceList}`;
     ? `\n📌 *Titik GPS Akurat:* ${order.location.lat.toFixed(6)}, ${order.location.lng.toFixed(6)}`
     : '';
   const mapsPinUrl = order.location.mapsUrl || (order.location.lat && order.location.lng ? `https://www.google.com/maps?q=${order.location.lat},${order.location.lng}` : '');
-  const mapsShareLine = mapsPinUrl ? `\n🗺️ *Link Share-Loc Kurir:* ${mapsPinUrl}` : '';
+  const mapsShareLine = mapsPinUrl
+    ? `\n🗺️ *Link Share-Loc Kurir:* ${mapsPinUrl}`
+    : `\n📍 *Share-Loc Kurir:* _(Saya kirim titik 📍 Lokasi bawaan WhatsApp langsung di chat ini setelah pesan ini terkirim!)_`;
 
   const locationText = order.pickupType === 'drop_off'
     ? `🏢 *Metode:* Drop-off Langsung ke Workshop Soleman (Jl. Sukalila Selatan Cirebon)`
     : `${logisticsLabel}
-📍 *Wilayah Pelanggan:* ${order.customerName} (Kec. ${order.location.areaName})
-🏠 *Alamat / Patokan:* ${order.location.fullAddress || order.location.landmark || '-'}
+🏠 *Patokan / Alamat:* ${order.location.fullAddress || order.location.landmark || 'Share-Loc via WhatsApp'}
 ⏰ *Jadwal Jemput:* Sesi ${order.preferredTimeSlot.toUpperCase()}${gpsText}${mapsShareLine}`;
 
   const photoNote = (order.photos && order.photos.length > 0) || order.photoUrl

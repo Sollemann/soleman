@@ -19,24 +19,17 @@ import {
   Layers, 
   Sparkles, 
   QrCode, 
-  Crosshair,
-  ClipboardPaste,
   Bell,
-  Navigation,
   Check
 } from 'lucide-react';
 import { 
   SERVICES_CATALOG, 
-  CIREBON_AREAS, 
-  KOTA_CIREBON_KECAMATAN,
   WORKSHOP_INFO, 
   SHOE_SIZES,
   STATUS_LABELS,
   isTapakOrSoleSizeRequired,
-  calculateDistanceToWorkshop,
   calculateServicePrice,
-  getServiceTierDetail,
-  findClosestCirebonArea
+  getServiceTierDetail
 } from '../data/solcreftData';
 import { 
   ServiceItem, 
@@ -49,7 +42,7 @@ import {
   CustomerUser,
   ServiceStockItem
 } from '../types';
-import { buildNewOrderWhatsAppUrl, parseShareLocInput } from '../services/whatsappHelper';
+import { buildNewOrderWhatsAppUrl } from '../services/whatsappHelper';
 import { isServiceOrSizeOutOfStock } from '../services/firebaseStockService';
 import { soundFx } from '../services/soundEffects';
 
@@ -172,35 +165,9 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     }
   }, [initialServices, initialShoeType, initialPairsCount, initialArea, initialSeverity, initialShoeSize]);
 
-  // Delivery State: Antar-Jemput Kurir Langsung + Bagi Lokasi Akurat Otomatis
+  // Delivery State: Antar-Jemput Kurir Langsung + Share-Loc via WhatsApp
   const [pickupType] = useState<'antar_jemput' | 'drop_off'>('antar_jemput');
-  const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Kota Cirebon (Otomatis via Lokasi)');
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [gpsAccuracyMeters, setGpsAccuracyMeters] = useState<number | null>(null);
-  const [shareLocInput, setShareLocInput] = useState('');
-  const [isLocatingGps, setIsLocatingGps] = useState(false);
-  const [gpsStatusMsg, setGpsStatusMsg] = useState('');
-  const shareInputRef = React.useRef<HTMLInputElement>(null);
-  const watchIdRef = React.useRef<number | null>(null);
-
-  // Jika izin GPS sudah pernah diberikan sebelumnya, langsung kunci titik lokasi akurat otomatis
-  useEffect(() => {
-    if (typeof navigator === 'undefined' || !navigator.permissions?.query) return;
-    navigator.permissions
-      .query({ name: 'geolocation' as PermissionName })
-      .then((res) => {
-        if (res.state === 'granted' && !gpsCoords && !shareLocInput) {
-          handleDetectGps();
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      if (watchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-    };
-  }, []);
+  const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Share-Loc via WhatsApp');
 
   // Active Menu Tab for Service Selection (Organized by Menu Category)
   const [activeFormMenuTab, setActiveFormMenuTab] = useState<'jahit' | 'sol' | 'treatment' | 'rekonstruksi'>('jahit');
@@ -368,153 +335,6 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     updateActiveShoe({ photoPreview: undefined, aiDetectedSeverity: undefined, aiDiagnostics: undefined });
   };
 
-  // Deteksi GPS Akurasi Tinggi 1-Klik (Multi-Sample watchPosition, tanpa cache lama)
-  const applyAccurateCoords = (lat: number, lng: number, accuracyMeters: number | null, sourceLabel: string) => {
-    const cleanLat = Number(lat.toFixed(6));
-    const cleanLng = Number(lng.toFixed(6));
-    const dist = calculateDistanceToWorkshop(cleanLat, cleanLng);
-    const closest = findClosestCirebonArea(cleanLat, cleanLng);
-    const mapsLink = `https://www.google.com/maps?q=${cleanLat},${cleanLng}`;
-    setAreaName(closest.name);
-    setGpsCoords({ lat: cleanLat, lng: cleanLng });
-    setGpsAccuracyMeters(accuracyMeters);
-    setShareLocInput(mapsLink);
-    const accText = accuracyMeters ? ` • Akurasi ±${accuracyMeters}m` : '';
-    setGpsStatusMsg(
-      `✓ ${sourceLabel}: ${closest.name} (${closest.type === 'Kota' ? 'GRATIS ONGKIR Kota' : 'Ongkir 15k Kab.'}) • ±${dist} KM${accText}`
-    );
-  };
-
-  const handleDetectGps = () => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setGpsStatusMsg('Perangkat belum mendukung GPS otomatis. Salin link Google Maps lalu pencet Tempel Otomatis.');
-      return;
-    }
-
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-
-    setIsLocatingGps(true);
-    setGpsStatusMsg('Mengkalibrasi sinyal GPS presisi tinggi (tanpa cache)...');
-
-    let bestPos: GeolocationPosition | null = null;
-    let settled = false;
-
-    const finalizeBest = () => {
-      if (settled) return;
-      settled = true;
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-      setIsLocatingGps(false);
-      if (bestPos) {
-        const acc = Math.round(bestPos.coords.accuracy || 0);
-        applyAccurateCoords(
-          bestPos.coords.latitude,
-          bestPos.coords.longitude,
-          acc || null,
-          acc > 200 ? 'Lokasi WiFi/Jaringan Terkunci' : 'Lokasi GPS Akurat Terkunci'
-        );
-        soundFx.playSuccess();
-      } else {
-        setGpsStatusMsg('Izin GPS belum aktif. Salin link Share-Loc / Google Maps rumah Anda lalu pencet tombol Tempel Otomatis!');
-      }
-    };
-
-    const calibrationTimer = window.setTimeout(() => {
-      if (bestPos) {
-        finalizeBest();
-      }
-    }, 3500);
-
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        if (!bestPos || (pos.coords.accuracy || 9999) < (bestPos.coords.accuracy || 9999)) {
-          bestPos = pos;
-          const accNow = Math.round(pos.coords.accuracy || 0);
-          setGpsStatusMsg(`Menyaring koordinat terbaik... (akurasi saat ini ±${accNow} m)`);
-          if (accNow > 0 && accNow <= 22) {
-            window.clearTimeout(calibrationTimer);
-            finalizeBest();
-          }
-        }
-      },
-      () => {
-        window.clearTimeout(calibrationTimer);
-        if (bestPos) {
-          finalizeBest();
-        } else {
-          settled = true;
-          if (watchIdRef.current !== null) {
-            navigator.geolocation.clearWatch(watchIdRef.current);
-            watchIdRef.current = null;
-          }
-          setIsLocatingGps(false);
-          setGpsStatusMsg('Izin GPS belum aktif. Salin link Share-Loc / Google Maps rumah Anda lalu pencet tombol Tempel Otomatis!');
-        }
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 }
-    );
-  };
-
-  const handleShareLocInputChange = (val: string) => {
-    setShareLocInput(val);
-    const parsed = parseShareLocInput(val);
-    if (parsed.lat && parsed.lng) {
-      applyAccurateCoords(parsed.lat, parsed.lng, 10, 'Pin Maps Terdeteksi Akurat');
-      soundFx.playSuccess();
-    } else if (parsed.cleanUrl) {
-      setGpsCoords(null);
-      setGpsAccuracyMeters(null);
-      setGpsStatusMsg('⏳ Mengurai koordinat asli dari link Google Maps...');
-      fetch('/api/resolve-maps-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: parsed.cleanUrl }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data?.lat && data?.lng) {
-            applyAccurateCoords(data.lat, data.lng, 10, 'Link Google Maps Akurat Terkunci');
-            setShareLocInput(parsed.cleanUrl!);
-            soundFx.playSuccess();
-          } else {
-            setGpsStatusMsg('✓ Link Google Maps berhasil ditempel otomatis dan siap dibuka Kurir!');
-          }
-        })
-        .catch(() => {
-          setGpsStatusMsg('✓ Link Google Maps berhasil ditempel otomatis dan siap dibuka Kurir!');
-        });
-    } else if (!val.trim()) {
-      setGpsCoords(null);
-      setGpsAccuracyMeters(null);
-      setGpsStatusMsg('');
-    }
-  };
-
-  const handleOneClickPasteLocation = async () => {
-    soundFx.playClick();
-    try {
-      if (navigator.clipboard && navigator.clipboard.readText) {
-        const clipText = await navigator.clipboard.readText();
-        if (clipText && clipText.trim()) {
-          handleShareLocInputChange(clipText.trim());
-          return;
-        }
-        setGpsStatusMsg('Clipboard masih kosong. Salin link Share-Loc / Google Maps dulu, lalu pencet Tempel Otomatis.');
-        shareInputRef.current?.focus();
-        return;
-      }
-    } catch {
-      // Fallback bila browser membatasi akses baca clipboard otomatis
-    }
-    setGpsStatusMsg('Tekan & tahan kotak link lalu pilih Tempel/Paste — koordinat titik lokasi langsung terbaca.');
-    shareInputRef.current?.focus();
-  };
-
   // Calculate pricing
   const shoeDetailsWithPrices: ShoeItemDetail[] = shoesList.map((shoe, idx) => {
     const selectedServiceObjs = SERVICES_CATALOG.filter(s => shoe.serviceIds.includes(s.id));
@@ -539,22 +359,9 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
   const totalServicesPrice = shoeDetailsWithPrices.reduce((sum, s) => sum + s.price, 0);
 
-  // Cek apakah wilayah termasuk Wilayah Kota Cirebon (Gratis Ongkir Khusus Kota)
-  const isAreaInKotaCirebon = (name: string): boolean => {
-    const lower = name.toLowerCase();
-    if (lower.includes('kota cirebon')) return true;
-    const isKecamatanKota = KOTA_CIREBON_KECAMATAN.some(k => lower.includes(k.toLowerCase()));
-    const matched = CIREBON_AREAS.find(a => a.name.toLowerCase() === lower);
-    return isKecamatanKota || matched?.type === 'Kota';
-  };
-
-  const isKota = isAreaInKotaCirebon(areaName);
-
   // Aturan Ongkir:
-  // - Drop-off mandiri ke Workshop Sukalila: Rp 0
-  // - Antar-jemput Wilayah Kota Cirebon: Rp 0 (GRATIS ONGKIR)
-  // - Antar-jemput Wilayah Kabupaten Cirebon: Rp 15.000 (15k)
-  const deliveryFee = pickupType === 'drop_off' ? 0 : isKota ? 0 : 15000;
+  // - Kota Cirebon Gratis Ongkir (Rp 0), Kabupaten Rp 15.000 — dikonfirmasi lewat Share-Loc WhatsApp ke Kurir
+  const deliveryFee = pickupType === 'drop_off' ? 0 : 0;
   const grandTotal = totalServicesPrice + deliveryFee;
 
   // Handle Order Submit
@@ -609,14 +416,8 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       ? shoesList[0].shoeBrand 
       : `${shoesList[0].shoeBrand} (+${pairsCount - 1} pasang)`;
 
-    const cleanArea = areaName.trim() || 'Kota Cirebon (Otomatis via Lokasi)';
-    const parsedShareInput = parseShareLocInput(shareLocInput);
-    const finalLat = gpsCoords?.lat ?? parsedShareInput.lat;
-    const finalLng = gpsCoords?.lng ?? parsedShareInput.lng;
-    const finalMapsUrl = (finalLat && finalLng)
-      ? `https://www.google.com/maps?q=${finalLat},${finalLng}`
-      : parsedShareInput.cleanUrl;
-    const hasSharedLocation = Boolean((finalLat && finalLng) || finalMapsUrl);
+    const cleanArea = areaName.trim() || 'Share-Loc via WhatsApp';
+    const cleanAddressNote = customerAddress.trim();
 
     const newOrder: Order = {
       id: `SLC-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -636,23 +437,18 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       photos: allPhotos,
       pickupType,
       preferredTimeSlot: 'siang',
-      distanceZone: isKota ? 'dekat_kota' : 'jauh_kabupaten',
+      distanceZone: 'dekat_kota',
       logisticsPartner: 'kurir_soleman',
       customerConfirmedMaterialPhoto: true,
       location: {
         areaName: cleanArea,
-        areaType: isKota ? 'Kota' : 'Kabupaten',
-        distanceZone: isKota ? 'dekat_kota' : 'jauh_kabupaten',
+        areaType: 'Kota',
+        distanceZone: 'dekat_kota',
         logisticsPartner: 'kurir_soleman',
         shareLocViaWhatsApp: true,
-        isLiveShared: hasSharedLocation,
-        liveSharedAt: hasSharedLocation ? new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : undefined,
-        fullAddress: customerAddress.trim() ? `${customerAddress.trim()}, Kec. ${cleanArea}, Cirebon` : `Kec. ${cleanArea}, Cirebon`,
-        landmark: customerAddress.trim() || `Titik Lokasi: ${customerName.trim()} (${cleanArea})`,
-        lat: finalLat,
-        lng: finalLng,
-        accuracy: finalLat ? 10 : undefined,
-        mapsUrl: finalMapsUrl,
+        isLiveShared: false,
+        fullAddress: cleanAddressNote || 'Share-Loc dikirim via WhatsApp (0831-5227-6387)',
+        landmark: cleanAddressNote || 'Kirim Share-Loc WA bawaan ke Kurir Soleman',
       },
       paymentMethod,
       paymentStatus: paymentMethod === 'cod' ? 'cod_pending' : 'menunggu_pembayaran',
@@ -671,7 +467,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           status: 'menunggu_jemput',
           label: 'Pesanan Diterima di Sistem',
           timestamp: 'Baru saja',
-          description: `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()} (${cleanArea})${hasSharedLocation ? ' dengan titik lokasi GPS akurat' : ''}. Siap dijadwalkan ke rute kurir.`
+          description: `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()}. Lokasi jemput dikirim via Share-Loc WhatsApp ke Kurir.`
         }
       ]
     };
@@ -775,20 +571,10 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                             : ord.timeline?.[0]?.description || `Diproses oleh ${ord.assignedCourier || 'Tim Soleman Cirebon'}.`}
                         </p>
 
-                        {ord.location.mapsUrl && (
-                          <div className="text-[11px] text-emerald-300 font-semibold flex items-center gap-1.5 flex-wrap pt-0.5">
-                            <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span>Titik lokasi terkunci akurat ({ord.location.areaName}).</span>
-                            <a
-                              href={ord.location.mapsUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline text-cyan-300 hover:text-white"
-                            >
-                              Cek Titik Maps
-                            </a>
-                          </div>
-                        )}
+                        <p className="text-[11px] text-emerald-300 font-semibold flex items-center gap-1.5 flex-wrap pt-0.5">
+                          <MessageSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span>Silakan kirim Share-Loc 📍 langsung lewat chat WhatsApp ke Kurir (0831-5227-6387) agar penjemputan cepat & akurat.</span>
+                        </p>
                       </div>
                     </div>
 
@@ -1193,192 +979,63 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           </div>
         </div>
 
-        {/* Step 3: Delivery & Automatic Share Location */}
+        {/* Step 3: Antar-Jemput & Share-Loc Melalui WhatsApp */}
         <div className="space-y-3 pt-2 border-t border-slate-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-cyan-400">
               <span className="w-5 h-5 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center text-[10px]">3</span>
-              <span>Bagikan Lokasi Antar-Jemput (Otomatis)</span>
+              <span>Lokasi Jemput Melalui WhatsApp</span>
             </div>
           </div>
 
-          {/* Pickup option banner: 100% Antar-Jemput Kurir */}
-          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
-                <Truck className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-xs font-bold text-white block">Layanan Antar-Jemput Kurir Langsung ke Rumah</span>
-                <p className="text-[11px] text-slate-400">Wilayah & ongkir otomatis terbaca dari titik Bagikan Lokasi / link Maps Anda.</p>
-              </div>
-            </div>
-            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border shrink-0 ${
-              isKota 
-                ? 'text-sky-300 bg-sky-950/60 border-sky-500/30' 
-                : 'text-slate-300 bg-slate-950 border-slate-700'
-            }`}>
-              {isKota ? 'Gratis Ongkir (Kota Cirebon)' : 'Ongkir Rp 15.000 (Kabupaten)'}
-            </span>
-          </div>
-
-          {/* Automatic Share Location & 1-Click Paste for Courier */}
-          <div className="space-y-3 bg-slate-950 p-4 rounded-2xl border border-cyan-500/25">
-              {/* Prominent Share Location CTA for Courier */}
-              <div className="p-3.5 rounded-xl bg-gradient-to-r from-cyan-950/60 to-sky-950/50 border border-cyan-400/40 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                  <div>
-                    <span className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Bagikan Lokasi Akurat Sekali Pencet (Tanpa Pilih Kecamatan)</span>
-                    </span>
-                    <p className="text-[11px] text-slate-300 mt-0.5">
-                      Klik tombol Bagikan Lokasi GPS atau pencet Tempel Otomatis untuk link Share-Loc / Google Maps.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleDetectGps}
-                    disabled={isLocatingGps}
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer shrink-0"
-                  >
-                    <Crosshair className="w-4 h-4 stroke-[2.5]" />
-                    <span>{isLocatingGps ? 'Mengunci GPS...' : gpsCoords ? '📍 Perbarui Lokasi GPS' : '📍 Bagikan Lokasi GPS'}</span>
-                  </button>
+          <div className="p-4 rounded-2xl bg-slate-950 border border-emerald-500/35 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <MessageSquare className="w-4 h-4" />
                 </div>
-
-                {gpsStatusMsg && (
-                  <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] px-3 py-2 rounded-lg border ${
-                    gpsAccuracyMeters && gpsAccuracyMeters > 200
-                      ? 'text-amber-200 bg-amber-950/40 border-amber-500/40'
-                      : 'text-emerald-300 bg-emerald-950/40 border-emerald-500/30'
-                  }`}>
-                    <span>{gpsStatusMsg}</span>
-                    {(gpsCoords || parseShareLocInput(shareLocInput).cleanUrl) && (
-                      <a
-                        href={gpsCoords ? `https://www.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}` : parseShareLocInput(shareLocInput).cleanUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-cyan-300 hover:text-white font-bold underline shrink-0"
-                      >
-                        <Navigation className="w-3 h-3" />
-                        <span>Buka Pin di Maps</span>
-                      </a>
-                    )}
-                  </div>
-                )}
-
-                {/* Visual Pin Preview Map when accurate coordinates locked */}
-                {gpsCoords && (
-                  <div className="rounded-xl overflow-hidden border border-cyan-500/40 bg-slate-900 space-y-1.5">
-                    <div className="px-3 py-1.5 bg-slate-950/80 flex items-center justify-between text-[10px]">
-                      <span className="font-bold text-cyan-300 flex items-center gap-1.5">
-                        <MapPin className="w-3 h-3 text-cyan-400" />
-                        Pin Lokasi Terkunci ({gpsCoords.lat}, {gpsCoords.lng})
-                        {gpsAccuracyMeters !== null && (
-                          <span className={`px-1.5 py-0.5 rounded font-mono ${
-                            gpsAccuracyMeters <= 50
-                              ? 'bg-emerald-500/20 text-emerald-300'
-                              : gpsAccuracyMeters <= 200
-                              ? 'bg-sky-500/20 text-sky-300'
-                              : 'bg-amber-500/20 text-amber-300'
-                          }`}>
-                            ±{gpsAccuracyMeters}m
-                          </span>
-                        )}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleDetectGps}
-                        className="text-sky-400 hover:text-sky-300 font-bold cursor-pointer"
-                      >
-                        Kunci Ulang GPS
-                      </button>
-                    </div>
-                    <iframe
-                      title="Pratinjau Titik Penjemputan Kurir"
-                      src={`https://maps.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}&z=18&output=embed`}
-                      className="w-full h-44 border-0"
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                    />
-                    {gpsAccuracyMeters !== null && gpsAccuracyMeters > 200 && (
-                      <p className="px-3 pb-2 text-[10px] text-amber-300">
-                        Tip: GPS laptop/WiFi perkiraan ±{gpsAccuracyMeters}m. Agar pas depan rumah, salin titik pin dari aplikasi Google Maps lalu pencet <strong>Tempel Otomatis</strong>.
-                      </p>
-                    )}
-                  </div>
-                )}
-
                 <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
-                    Tempel Link Share-Loc / Google Maps Rumah Anda:
-                  </label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      ref={shareInputRef}
-                      type="text"
-                      value={shareLocInput}
-                      onChange={(e) => handleShareLocInputChange(e.target.value)}
-                      onPaste={(e) => {
-                        const pasted = e.clipboardData?.getData('text');
-                        if (pasted) {
-                          e.preventDefault();
-                          handleShareLocInputChange(pasted.trim());
-                        }
-                      }}
-                      placeholder="Tempel link Maps (https://maps.app.goo.gl/... atau koordinat)"
-                      className="flex-1 px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none font-mono placeholder:font-sans placeholder:text-slate-600"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleOneClickPasteLocation}
-                      className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
-                    >
-                      <ClipboardPaste className="w-4 h-4 stroke-[2.5]" />
-                      <span>Tempel Otomatis</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Dynamic Auto-Detected Area & Ongkir Banner */}
-              <div className={`p-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-2 text-xs font-semibold ${
-                isKota 
-                  ? 'bg-cyan-950/40 border-cyan-400/50 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
-                  : 'bg-slate-900 border-slate-800 text-slate-300'
-              }`}>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
-                  <span>
-                    {gpsCoords
-                      ? `📍 Terdeteksi Otomatis: ${areaName} • ${isKota ? 'GRATIS ONGKIR Kota Cirebon' : 'Ongkir Rp 15.000 (Kab. Cirebon)'}`
-                      : parseShareLocInput(shareLocInput).cleanUrl
-                      ? '📍 Link Maps Terpasang Otomatis • Siap Dijemput Kurir'
-                      : isKota
-                      ? '🎉 Wilayah Kota Cirebon GRATIS ONGKIR (Otomatis via Bagikan Lokasi)'
-                      : '🛵 Wilayah Kabupaten Cirebon Ongkir Rp 15.000'}
+                  <span className="text-xs font-black text-white block">
+                    Kirim Share-Loc Langsung Lewat WhatsApp ke Kurir
                   </span>
+                  <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                    Tidak perlu pilih kecamatan atau GPS di web — cukup kirim <strong>📍 Share-Loc bawaan WhatsApp</strong> Anda ke Kurir (<strong>0831-5227-6387</strong>) agar titik rumah 100% akurat!
+                  </p>
                 </div>
-                <span className="font-mono font-black text-white">
-                  {isKota ? 'Rp 0' : 'Rp 15.000'}
-                </span>
               </div>
-
-              {/* Input Alamat Lengkap & Patokan Rumah */}
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  Alamat Lengkap / Patokan Rumah / Toko (Biar Kurir Cepat Sampai):
-                </label>
-                <input
-                  type="text"
-                  value={customerAddress}
-                  onChange={(e) => setCustomerAddress(e.target.value)}
-                  placeholder="Contoh: Jl. Sukalila No. 12 RT 02/03, pagar hitam sebelah minimarket"
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none transition-colors placeholder:text-slate-600"
-                />
-              </div>
+              <a
+                href={`https://wa.me/${WORKSHOP_INFO.phone}?text=${encodeURIComponent(
+                  `Halo Kurir Soleman Cirebon! Saya ${customerName.trim() || 'Pelanggan'} mau kirim Share-Loc penjemputan sepatu saya 📍`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all shrink-0"
+              >
+                <MapPin className="w-4 h-4 stroke-[2.5]" />
+                <span>Share-Loc via WA Kurir</span>
+              </a>
             </div>
+
+            <div className="p-2.5 rounded-xl bg-cyan-950/35 border border-cyan-500/30 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <span className="text-cyan-300 font-semibold">
+                🛵 Gratis Ongkir wilayah Kota Cirebon • Kab. Cirebon Rp 15.000 (konfirmasi via Share-Loc WA)
+              </span>
+            </div>
+
+            {/* Input Alamat Lengkap & Patokan Rumah (Opsional) */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                Patokan Rumah / Catatan Alamat (Opsional):
+              </label>
+              <input
+                type="text"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                placeholder="Contoh: Pagar hitam depan minimarket (nanti saya Share-Loc di WA)"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none transition-colors placeholder:text-slate-600"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Step 4: Payment Method */}
@@ -1455,20 +1112,20 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="button"
-              onClick={() => handleCreateOrder(false)}
-              className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-400/30 transition-all cursor-pointer"
+              onClick={() => handleCreateOrder(true)}
+              className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
             >
-              <Truck className="w-4 h-4 stroke-[2.5]" />
-              <span>Pesan Sekarang (Langsung Masuk Sistem)</span>
+              <MessageSquare className="w-4 h-4 stroke-[2.5]" />
+              <span>Pesan & Kirim Share-Loc via WhatsApp</span>
             </button>
 
             <button
               type="button"
-              onClick={() => handleCreateOrder(true)}
+              onClick={() => handleCreateOrder(false)}
               className="py-3.5 px-6 rounded-xl bg-slate-800 hover:bg-slate-750 text-white font-bold text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all cursor-pointer"
             >
-              <MessageSquare className="w-4 h-4 text-emerald-400" />
-              <span>Pesan & Kirim ke WhatsApp</span>
+              <Truck className="w-4 h-4 text-cyan-400" />
+              <span>Simpan Pesanan Saja</span>
             </button>
           </div>
         </div>
