@@ -115,11 +115,6 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
   >('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Origin Mode untuk Optimasi Rute Nearest-Neighbor (Workshop vs GPS Kurir Live)
-  const [routeStartMode, setRouteStartMode] = useState<'workshop' | 'gps'>('workshop');
-  const [courierOriginGps, setCourierOriginGps] = useState<{ lat: number; lng: number } | null>(null);
-  const [isDetectingCourierGps, setIsDetectingCourierGps] = useState(false);
-
   // Mapping koordinat pusat kecamatan se-Cirebon untuk estimasi jarak akurat
   const CIREBON_COORDINATES: Record<string, { lat: number; lng: number }> = {
     'pekalipan': { lat: -6.7180, lng: 108.5640 },
@@ -176,11 +171,8 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
     return { lat: WORKSHOP_INFO.lat, lng: WORKSHOP_INFO.lng, isEstimated: true };
   };
 
-  // Algoritma Rute Terdekat Berantai (Nearest-Neighbor TSP) agar kurir tidak bolak-balik
-  const routeOriginCoords =
-    routeStartMode === 'gps' && courierOriginGps
-      ? courierOriginGps
-      : { lat: WORKSHOP_INFO.lat, lng: WORKSHOP_INFO.lng };
+  // Algoritma Rute Terdekat Berantai (Nearest-Neighbor TSP) mulai dari Workshop Sukalila agar kurir tidak bolak-balik
+  const routeOriginCoords = { lat: WORKSHOP_INFO.lat, lng: WORKSHOP_INFO.lng };
 
   const activeRouteStops = (() => {
     const candidates = orders
@@ -205,7 +197,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
 
     const remaining = [...candidates];
     let cursor = { lat: routeOriginCoords.lat, lng: routeOriginCoords.lng };
-    let cursorLabel = routeStartMode === 'gps' && courierOriginGps ? 'Posisi GPS Kurir' : 'Workshop Sukalila';
+    let cursorLabel = 'Workshop Sukalila';
     let cumulative = 0;
 
     while (remaining.length > 0) {
@@ -241,31 +233,6 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
     activeRouteStops.length > 0
       ? activeRouteStops[activeRouteStops.length - 1].cumulativeDistanceKm
       : 0;
-
-  const handleDetectCourierGps = () => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      showToast('Browser tidak mendukung GPS langsung.');
-      return;
-    }
-    setIsDetectingCourierGps(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCourierOriginGps({
-          lat: Number(pos.coords.latitude.toFixed(6)),
-          lng: Number(pos.coords.longitude.toFixed(6)),
-        });
-        setRouteStartMode('gps');
-        setIsDetectingCourierGps(false);
-        soundFx.playSuccess();
-        showToast('🛰️ Posisi GPS Kurir aktif! Rute diurutkan ulang dari lokasi Anda saat ini.');
-      },
-      () => {
-        setIsDetectingCourierGps(false);
-        showToast('Gagal membaca GPS kurir. Pastikan izin lokasi browser aktif.');
-      },
-      { enableHighAccuracy: true, timeout: 9000 }
-    );
-  };
 
   const buildMultiStopRouteUrl = () => {
     if (activeRouteStops.length === 0) return '';
@@ -1242,41 +1209,6 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                   <span>🚀 Buka Semua Rute Sekaligus di Google Maps ({activeRouteStops.length} Titik)</span>
                 </a>
               )}
-            </div>
-
-            {/* Toggle Titik Awal Rute: Workshop vs GPS Kurir Live */}
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800 text-xs">
-              <span className="text-slate-400 font-bold">Mulai Jalur Dari:</span>
-              <button
-                type="button"
-                onClick={() => setRouteStartMode('workshop')}
-                className={`px-3 py-1.5 rounded-xl font-bold border transition-all cursor-pointer ${
-                  routeStartMode === 'workshop'
-                    ? 'bg-cyan-400 text-slate-950 border-cyan-300'
-                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                🏢 Workshop Sukalila
-              </button>
-              <button
-                type="button"
-                onClick={handleDetectCourierGps}
-                disabled={isDetectingCourierGps}
-                className={`px-3 py-1.5 rounded-xl font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
-                  routeStartMode === 'gps' && courierOriginGps
-                    ? 'bg-emerald-400 text-slate-950 border-emerald-300'
-                    : 'bg-slate-950 text-cyan-300 border-cyan-500/40 hover:bg-cyan-950/50'
-                }`}
-              >
-                <Crosshair className="w-3.5 h-3.5" />
-                <span>
-                  {isDetectingCourierGps
-                    ? 'Membaca GPS Kurir...'
-                    : routeStartMode === 'gps' && courierOriginGps
-                    ? `🛰️ Posisi GPS Kurir Aktif (${courierOriginGps.lat.toFixed(4)}, ${courierOriginGps.lng.toFixed(4)})`
-                    : '🛰️ Gunakan Posisi GPS Kurir Saat Ini'}
-                </span>
-              </button>
             </div>
           </div>
 

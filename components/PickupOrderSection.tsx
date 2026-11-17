@@ -20,10 +20,7 @@ import {
   Sparkles, 
   QrCode, 
   Bell,
-  Check,
-  Navigation,
-  Loader2,
-  RefreshCw
+  Check
 } from 'lucide-react';
 import { 
   SERVICES_CATALOG, 
@@ -32,9 +29,7 @@ import {
   STATUS_LABELS,
   isTapakOrSoleSizeRequired,
   calculateServicePrice,
-  getServiceTierDetail,
-  findClosestCirebonArea,
-  calculateDistanceToWorkshop
+  getServiceTierDetail
 } from '../data/solcreftData';
 import { 
   ServiceItem, 
@@ -47,7 +42,7 @@ import {
   CustomerUser,
   ServiceStockItem
 } from '../types';
-import { buildNewOrderWhatsAppUrl } from '../services/whatsappHelper';
+import { buildNewOrderWhatsAppUrl, parseShareLocInput } from '../services/whatsappHelper';
 import { isServiceOrSizeOutOfStock } from '../services/firebaseStockService';
 import { soundFx } from '../services/soundEffects';
 
@@ -170,17 +165,10 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     }
   }, [initialServices, initialShoeType, initialPairsCount, initialArea, initialSeverity, initialShoeSize]);
 
-  // Delivery State: Antar-Jemput Kurir Langsung + Otomatis Kirim Lokasi Saat Ini Akurat di Web Soleman ke Kurir
+  // Delivery State: Alamat Penjemputan & Link Google Maps (Opsional) tanpa akses lokasi browser
   const [pickupType] = useState<'antar_jemput' | 'drop_off'>('antar_jemput');
-  const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Cirebon (Lokasi Otomatis)');
-  const [liveGpsCoords, setLiveGpsCoords] = useState<{
-    lat: number;
-    lng: number;
-    accuracy: number;
-    capturedAt: number;
-  } | null>(null);
-  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [gpsStatusNote, setGpsStatusNote] = useState<string | null>(null);
+  const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Cirebon');
+  const [mapsLinkInput, setMapsLinkInput] = useState<string>('');
 
   // Active Menu Tab for Service Selection (Organized by Menu Category)
   const [activeFormMenuTab, setActiveFormMenuTab] = useState<'jahit' | 'sol' | 'treatment' | 'rekonstruksi'>('jahit');
@@ -191,114 +179,6 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   // UI state
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [validationError, setValidationError] = useState('');
-
-  // Tangkap lokasi GPS berakurasi tinggi (watchPosition menyaring sampel terbaik hingga <= 15m atau maks ~3 detik)
-  const captureAccurateLocationNow = (
-    timeoutMs: number = 3200
-  ): Promise<{ lat: number; lng: number; accuracy: number } | null> => {
-    return new Promise((resolve) => {
-      if (typeof navigator === 'undefined' || !navigator.geolocation) {
-        setGpsStatusNote('Perangkat/browser tidak mendukung deteksi GPS otomatis.');
-        resolve(null);
-        return;
-      }
-
-      let bestSample: { lat: number; lng: number; accuracy: number } | null = null;
-      let settled = false;
-      let watchId: number | null = null;
-
-      const finish = (sample: { lat: number; lng: number; accuracy: number } | null, errorMsg?: string) => {
-        if (settled) return;
-        settled = true;
-        if (watchId !== null) {
-          try {
-            navigator.geolocation.clearWatch(watchId);
-          } catch {}
-        }
-        clearTimeout(timer);
-        if (sample) {
-          setLiveGpsCoords({ ...sample, capturedAt: Date.now() });
-          const closest = findClosestCirebonArea(sample.lat, sample.lng);
-          setAreaName(closest.name);
-          setGpsStatusNote(null);
-        } else if (errorMsg) {
-          setGpsStatusNote(errorMsg);
-        }
-        resolve(sample);
-      };
-
-      const timer = window.setTimeout(() => {
-        finish(bestSample, bestSample ? undefined : 'Izin lokasi belum aktif atau sinyal GPS lemah.');
-      }, timeoutMs);
-
-      try {
-        watchId = navigator.geolocation.watchPosition(
-          (pos) => {
-            const sample = {
-              lat: Number(pos.coords.latitude.toFixed(6)),
-              lng: Number(pos.coords.longitude.toFixed(6)),
-              accuracy: Math.max(1, Math.round(pos.coords.accuracy || 15)),
-            };
-            if (!bestSample || sample.accuracy < bestSample.accuracy) {
-              bestSample = sample;
-            }
-            if (sample.accuracy <= 15) {
-              finish(bestSample);
-            }
-          },
-          (err) => {
-            const errNote =
-              err.code === 1
-                ? 'Akses lokasi ditolak browser. Aktifkan izin lokasi agar kurir dapat titik rumah secara akurat.'
-                : 'Belum berhasil mengunci GPS saat ini.';
-            finish(bestSample, bestSample ? undefined : errNote);
-          },
-          {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: timeoutMs + 1500,
-          }
-        );
-      } catch {
-        finish(null, 'Gagal mengakses layanan lokasi perangkat.');
-      }
-    });
-  };
-
-  // Otomatis kunci lokasi di background apabila izin lokasi sudah diizinkan browser
-  useEffect(() => {
-    let cancelled = false;
-    if (typeof navigator !== 'undefined' && 'permissions' in navigator) {
-      navigator.permissions
-        .query({ name: 'geolocation' as PermissionName })
-        .then((perm) => {
-          if (!cancelled && perm.state === 'granted') {
-            setIsDetectingLocation(true);
-            captureAccurateLocationNow(2800).finally(() => {
-              if (!cancelled) setIsDetectingLocation(false);
-            });
-          }
-        })
-        .catch(() => {});
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleManualLockLocation = async () => {
-    soundFx.playClick();
-    setIsDetectingLocation(true);
-    setGpsStatusNote(null);
-    try {
-      const sample = await captureAccurateLocationNow(3200);
-      if (sample) {
-        soundFx.playSuccess();
-      }
-    } finally {
-      setIsDetectingLocation(false);
-    }
-  };
 
   // Synchronize shoesList when pairsCount changes
   useEffect(() => {
@@ -480,19 +360,12 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
   const totalServicesPrice = shoeDetailsWithPrices.reduce((sum, s) => sum + s.price, 0);
 
-  const detectedAreaFromGps = liveGpsCoords
-    ? findClosestCirebonArea(liveGpsCoords.lat, liveGpsCoords.lng)
-    : null;
-  const detectedDistanceKm = liveGpsCoords
-    ? calculateDistanceToWorkshop(liveGpsCoords.lat, liveGpsCoords.lng)
-    : null;
-
-  // Aturan Ongkir: Kota Cirebon Gratis Ongkir (Rp 0), Kabupaten Rp 15.000 — otomatis dari koordinat lokasi akurat pelanggan
-  const deliveryFee = pickupType === 'drop_off' ? 0 : detectedAreaFromGps ? detectedAreaFromGps.deliveryFee : 0;
+  // Aturan Ongkir: Kota Cirebon Gratis Ongkir (Rp 0), Kabupaten Rp 15.000
+  const deliveryFee = pickupType === 'drop_off' ? 0 : 0;
   const grandTotal = totalServicesPrice + deliveryFee;
 
-  // Handle Order Submit: otomatis deteksi & kirim lokasi saat ini secara akurat langsung ke Portal Kurir Soleman
-  const handleCreateOrder = async (sendToWhatsApp: boolean = false) => {
+  // Handle Order Submit: simpan pesanan & alamat lengkap ke Portal Kurir Soleman
+  const handleCreateOrder = (sendToWhatsApp: boolean = false) => {
     setValidationError('');
 
     if (!customerName.trim()) {
@@ -531,28 +404,12 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       }
     }
 
-    const hasFreshGps = Boolean(liveGpsCoords && Date.now() - liveGpsCoords.capturedAt < 45000);
-    const preopenedWaWin = sendToWhatsApp && !hasFreshGps ? window.open('about:blank', '_blank') : null;
-
-    let gpsResult: { lat: number; lng: number; accuracy: number } | null =
-      hasFreshGps && liveGpsCoords
-        ? { lat: liveGpsCoords.lat, lng: liveGpsCoords.lng, accuracy: liveGpsCoords.accuracy }
-        : null;
-
-    if (!gpsResult) {
-      setIsDetectingLocation(true);
-      try {
-        gpsResult = await captureAccurateLocationNow(3200);
-      } finally {
-        setIsDetectingLocation(false);
-      }
+    if (!customerAddress.trim() && !mapsLinkInput.trim()) {
+      setValidationError('Silakan isi alamat penjemputan / patokan rumah Anda agar kurir mudah menemukan lokasi.');
+      return;
     }
 
-    const closestArea = gpsResult ? findClosestCirebonArea(gpsResult.lat, gpsResult.lng) : null;
-    const distanceFromWorkshopKm = gpsResult ? calculateDistanceToWorkshop(gpsResult.lat, gpsResult.lng) : undefined;
-    const effectiveDeliveryFee = pickupType === 'drop_off' ? 0 : closestArea ? closestArea.deliveryFee : deliveryFee;
-    const effectiveGrandTotal = totalServicesPrice + effectiveDeliveryFee;
-    const mapsPinUrl = gpsResult ? `https://www.google.com/maps?q=${gpsResult.lat},${gpsResult.lng}` : undefined;
+    const parsedMaps = mapsLinkInput.trim() ? parseShareLocInput(mapsLinkInput) : {};
 
     const allPhotos = shoeDetailsWithPrices
       .map(s => s.photoUrl)
@@ -566,9 +423,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       ? shoesList[0].shoeBrand 
       : `${shoesList[0].shoeBrand} (+${pairsCount - 1} pasang)`;
 
-    const cleanArea = closestArea?.name || areaName.trim() || 'Cirebon (Lokasi Otomatis)';
-    const effectiveAreaType = closestArea?.type || 'Kota';
-    const effectiveDistanceZone = effectiveAreaType === 'Kota' ? 'dekat_kota' : 'jauh_kabupaten';
+    const cleanArea = areaName.trim() || 'Cirebon';
     const cleanAddressNote = customerAddress.trim();
 
     const newOrder: Order = {
@@ -589,29 +444,27 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       photos: allPhotos,
       pickupType,
       preferredTimeSlot: 'siang',
-      distanceZone: effectiveDistanceZone,
+      distanceZone: 'dekat_kota',
       logisticsPartner: 'kurir_soleman',
       customerConfirmedMaterialPhoto: true,
       location: {
         areaName: cleanArea,
-        areaType: effectiveAreaType,
-        distanceZone: effectiveDistanceZone,
+        areaType: 'Kota',
+        distanceZone: 'dekat_kota',
         logisticsPartner: 'kurir_soleman',
         shareLocViaWhatsApp: false,
-        isLiveShared: Boolean(gpsResult),
-        liveSharedAt: gpsResult ? new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB' : undefined,
-        lat: gpsResult?.lat,
-        lng: gpsResult?.lng,
-        accuracy: gpsResult?.accuracy,
-        mapsUrl: mapsPinUrl,
-        fullAddress: cleanAddressNote || (gpsResult ? `${cleanArea} • GPS Akurat ±${gpsResult.accuracy}m (~${distanceFromWorkshopKm} KM)` : 'Menunggu titik lokasi pelanggan'),
-        landmark: cleanAddressNote || (gpsResult ? `Titik Lokasi Otomatis Web (±${gpsResult.accuracy}m • ${distanceFromWorkshopKm} KM)` : 'Lokasi dijemput Kurir Soleman'),
+        isLiveShared: Boolean(parsedMaps.lat || parsedMaps.cleanUrl),
+        lat: parsedMaps.lat,
+        lng: parsedMaps.lng,
+        mapsUrl: parsedMaps.cleanUrl,
+        fullAddress: cleanAddressNote || 'Lihat titik Google Maps pesanan',
+        landmark: cleanAddressNote || 'Alamat penjemputan Kurir Soleman',
       },
       paymentMethod,
       paymentStatus: paymentMethod === 'cod' ? 'cod_pending' : 'menunggu_pembayaran',
       totalServicesPrice,
-      deliveryFee: effectiveDeliveryFee,
-      totalAmount: effectiveGrandTotal,
+      deliveryFee,
+      totalAmount: grandTotal,
       status: 'menunggu_jemput',
       isAcceptedByAdmin: false,
       createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
@@ -624,9 +477,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           status: 'menunggu_jemput',
           label: 'Pesanan Diterima di Sistem',
           timestamp: 'Baru saja',
-          description: gpsResult
-            ? `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()}. Titik lokasi akurat (${gpsResult.lat.toFixed(5)}, ${gpsResult.lng.toFixed(5)} • ±${gpsResult.accuracy}m) otomatis terkirim ke Kurir.`
-            : `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()} masuk ke Portal Kurir Soleman.`
+          description: `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()}. Alamat: ${cleanAddressNote || parsedMaps.cleanUrl}.`
         }
       ]
     };
@@ -637,12 +488,6 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
     if (sendToWhatsApp) {
       const waUrl = buildNewOrderWhatsAppUrl(newOrder);
-      if (preopenedWaWin && !preopenedWaWin.closed) {
-        try {
-          preopenedWaWin.location.href = waUrl;
-          return;
-        } catch {}
-      }
       const opened = window.open(waUrl, '_blank', 'noopener,noreferrer');
       if (!opened) {
         try {
@@ -741,19 +586,12 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                             : ord.timeline?.[0]?.description || `Diproses oleh ${ord.assignedCourier || 'Tim Soleman Cirebon'}.`}
                         </p>
 
-                        {ord.location?.lat && ord.location?.lng ? (
-                          <p className="text-[11px] text-emerald-300 font-semibold flex items-center gap-1.5 flex-wrap pt-0.5">
-                            <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span>
-                              Lokasi akurat Anda (±{Math.round(ord.location.accuracy || 10)}m) otomatis terkirim ke Portal Kurir Soleman ({ord.location.areaName}).
-                            </span>
-                          </p>
-                        ) : (
-                          <p className="text-[11px] text-amber-300 font-semibold flex items-center gap-1.5 flex-wrap pt-0.5">
-                            <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                            <span>Tekan tombol di bawah untuk mengunci & mengirim titik lokasi saat ini langsung ke Kurir.</span>
-                          </p>
-                        )}
+                        <p className="text-[11px] text-emerald-300 font-semibold flex items-center gap-1.5 flex-wrap pt-0.5">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span>
+                            Lokasi jemput tersimpan untuk Kurir: {ord.location?.fullAddress || ord.location?.landmark || ord.location?.areaName}
+                          </span>
+                        </p>
                       </div>
                     </div>
 
@@ -795,64 +633,12 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                   {idx === 0 && createdOrder && (
                     <div className="space-y-2.5 pt-2 border-t border-slate-800">
                       <div className="flex flex-wrap items-center gap-3">
-                        {(!ord.location?.lat || !ord.location?.lng) && (
-                          <button
-                            type="button"
-                            disabled={isDetectingLocation}
-                            onClick={async () => {
-                              setIsDetectingLocation(true);
-                              try {
-                                const gps = await captureAccurateLocationNow(3200);
-                                if (gps) {
-                                  const closest = findClosestCirebonArea(gps.lat, gps.lng);
-                                  const distKm = calculateDistanceToWorkshop(gps.lat, gps.lng);
-                                  const updatedOrder: Order = {
-                                    ...ord,
-                                    deliveryFee: closest.deliveryFee,
-                                    totalAmount: ord.totalServicesPrice + closest.deliveryFee,
-                                    location: {
-                                      ...ord.location,
-                                      areaName: closest.name,
-                                      areaType: closest.type,
-                                      distanceZone: closest.type === 'Kota' ? 'dekat_kota' : 'jauh_kabupaten',
-                                      isLiveShared: true,
-                                      liveSharedAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
-                                      lat: gps.lat,
-                                      lng: gps.lng,
-                                      accuracy: gps.accuracy,
-                                      mapsUrl: `https://www.google.com/maps?q=${gps.lat},${gps.lng}`,
-                                      fullAddress: customerAddress.trim() || `${closest.name} • GPS Akurat ±${gps.accuracy}m (~${distKm} KM)`,
-                                    },
-                                  };
-                                  setCreatedOrder(updatedOrder);
-                                  onOrderCreated(updatedOrder);
-                                  soundFx.playSuccess();
-                                }
-                              } finally {
-                                setIsDetectingLocation(false);
-                              }
-                            }}
-                            className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 disabled:opacity-70 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
-                          >
-                            {isDetectingLocation ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Navigation className="w-4 h-4 stroke-[2.5]" />
-                            )}
-                            <span>
-                              {isDetectingLocation
-                                ? 'Mengunci Lokasi Akurat...'
-                                : 'Kirim Lokasi Saat Ini Akurat ke Kurir'}
-                            </span>
-                          </button>
-                        )}
-
                         <a
                           href={buildNewOrderWhatsAppUrl(ord)}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={() => soundFx.playClick()}
-                          className="py-3 px-4 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-400/40 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                          className="flex-1 py-3 px-4 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-400/40 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
                         >
                           <MessageSquare className="w-4 h-4" />
                           <span>Kirim Salinan ke WA (0831-5227-6387)</span>
@@ -1211,107 +997,46 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           </div>
         </div>
 
-        {/* Step 3: Otomatis Kirim Lokasi Saat Ini Secara Akurat di Web Soleman ke Kurir */}
+        {/* Step 3: Alamat Penjemputan Kurir Soleman */}
         <div className="space-y-3 pt-2 border-t border-slate-800">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-cyan-400">
               <span className="w-5 h-5 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center text-[10px]">3</span>
-              <span>Lokasi Penjemputan Otomatis ke Kurir Soleman</span>
+              <span>Alamat Penjemputan Kurir Soleman</span>
             </div>
-            {liveGpsCoords && (
-              <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-400/40 px-2.5 py-0.5 rounded-full">
-                📍 Lokasi Akurat Terkunci (±{liveGpsCoords.accuracy}m)
-              </span>
-            )}
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-950 border border-cyan-500/35 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${
-                  liveGpsCoords
-                    ? 'bg-emerald-500/15 border-emerald-400/40 text-emerald-400'
-                    : 'bg-cyan-500/15 border-cyan-400/30 text-cyan-400'
-                }`}>
-                  {isDetectingLocation ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Navigation className="w-4 h-4" />
-                  )}
-                </div>
-                <div>
-                  <span className="text-xs font-black text-white block">
-                    {liveGpsCoords
-                      ? 'Lokasi Saat Ini Terkunci Akurat — Siap Dikirim ke Kurir'
-                      : 'Otomatis Kirim Lokasi Saat Ini di Web Soleman ke Kurir'}
-                  </span>
-                  <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
-                    {liveGpsCoords && detectedAreaFromGps ? (
-                      <>
-                        Titik koordinat <strong className="text-emerald-300">{liveGpsCoords.lat.toFixed(5)}, {liveGpsCoords.lng.toFixed(5)}</strong> (±{liveGpsCoords.accuracy}m • <strong>{detectedAreaFromGps.name}</strong>, ~{detectedDistanceKm} KM) otomatis dikirim akurat ke Portal Kurir saat Anda memesan.
-                      </>
-                    ) : (
-                      <>
-                        Saat Anda menekan <strong>Pesan Sekarang</strong>, web Soleman otomatis mendeteksi titik lokasi Anda saat ini secara akurat dan langsung mengirimkannya ke Portal Kurir.
-                      </>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={isDetectingLocation}
-                onClick={handleManualLockLocation}
-                className={`px-3.5 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shrink-0 cursor-pointer border ${
-                  liveGpsCoords
-                    ? 'bg-slate-900 hover:bg-slate-800 text-cyan-300 border-cyan-500/40'
-                    : 'bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black border-cyan-300 shadow-lg shadow-cyan-500/20'
-                }`}
-              >
-                {isDetectingLocation ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Mengunci...</span>
-                  </>
-                ) : liveGpsCoords ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Perbarui Titik</span>
-                  </>
-                ) : (
-                  <>
-                    <Navigation className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>Kunci Lokasi Sekarang</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {gpsStatusNote && (
-              <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-[11px] text-amber-200 font-medium">
-                ⚠️ {gpsStatusNote}
-              </div>
-            )}
-
-            <div className="p-2.5 rounded-xl bg-cyan-950/35 border border-cyan-500/30 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-              <span className="text-cyan-300 font-semibold">
-                🛵 Gratis Ongkir wilayah Kota Cirebon • Kab. Cirebon Rp 15.000 (otomatis dihitung dari titik lokasi Anda)
-              </span>
-            </div>
-
-            {/* Input Alamat Lengkap & Patokan Rumah (Opsional) */}
             <div>
-              <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                Patokan Rumah / Catatan Alamat (Opsional):
+              <label className="text-[11px] font-bold text-slate-200 block mb-1">
+                Alamat Lengkap Penjemputan & Patokan Rumah:
               </label>
               <input
                 type="text"
                 value={customerAddress}
                 onChange={(e) => setCustomerAddress(e.target.value)}
-                placeholder="Contoh: Pagar hitam depan minimarket / No. rumah 12"
+                placeholder="Contoh: Jl. Cipto Mangunkusumo No. 45, Kec. Kesambi (Pagar hitam depan minimarket)"
                 className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none transition-colors placeholder:text-slate-600"
               />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                Link Google Maps / Koordinat (Opsional):
+              </label>
+              <input
+                type="text"
+                value={mapsLinkInput}
+                onChange={(e) => setMapsLinkInput(e.target.value)}
+                placeholder="Contoh: https://maps.app.goo.gl/... atau -6.7175, 108.5630"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none transition-colors placeholder:text-slate-600"
+              />
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-cyan-950/35 border border-cyan-500/30 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+              <span className="text-cyan-300 font-semibold">
+                🛵 Gratis Ongkir wilayah Kota Cirebon • Kab. Cirebon Rp 15.000
+              </span>
             </div>
           </div>
         </div>
@@ -1390,28 +1115,17 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="button"
-              disabled={isDetectingLocation}
               onClick={() => handleCreateOrder(false)}
-              className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 disabled:opacity-70 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer"
+              className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer"
             >
-              {isDetectingLocation ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Mengunci Lokasi Akurat & Mengirim Pesanan...</span>
-                </>
-              ) : (
-                <>
-                  <Navigation className="w-4 h-4 stroke-[2.5]" />
-                  <span>Pesan Sekarang (Lokasi Terkirim Akurat ke Kurir)</span>
-                </>
-              )}
+              <Truck className="w-4 h-4 stroke-[2.5]" />
+              <span>Pesan Sekarang (Kirim ke Kurir)</span>
             </button>
 
             <button
               type="button"
-              disabled={isDetectingLocation}
               onClick={() => handleCreateOrder(true)}
-              className="py-3.5 px-6 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 disabled:opacity-70 text-emerald-300 font-bold text-sm flex items-center justify-center gap-2 border border-emerald-400/40 transition-all cursor-pointer"
+              className="py-3.5 px-6 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-sm flex items-center justify-center gap-2 border border-emerald-400/40 transition-all cursor-pointer"
             >
               <MessageSquare className="w-4 h-4 text-emerald-400" />
               <span>Pesan & Salinan ke WA</span>

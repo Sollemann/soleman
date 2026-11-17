@@ -51,8 +51,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const [foundOrder, setFoundOrder] = useState<Order | null>(null);
-  const [isSharingLocation, setIsSharingLocation] = useState(false);
-  const [shareSuccessMsg, setShareSuccessMsg] = useState('');
 
   // Pencocokan cerdas: digit angka (misal 3891), kode SLC-xxxx, nomor telepon, nama pelanggan
   const findMatchingOrder = (input: string, list: Order[]): Order | undefined => {
@@ -80,7 +78,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setHasSearched(true);
-    setShareSuccessMsg('');
     if (!searchQuery.trim()) {
       setFoundOrder(null);
       return;
@@ -93,49 +90,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const handleQuickChipClick = (code: string) => {
     setSearchQuery(code);
     setHasSearched(true);
-    setShareSuccessMsg('');
     const matched = findMatchingOrder(code, orders);
     setFoundOrder(matched || null);
-  };
-
-  const handleShareGpsToCourier = () => {
-    if (!foundOrder || !onUpdateOrderLocation) return;
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setShareSuccessMsg('Perangkat Anda belum mendukung GPS otomatis.');
-      return;
-    }
-    setIsSharingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = Number(pos.coords.latitude.toFixed(6));
-        const lng = Number(pos.coords.longitude.toFixed(6));
-        const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-        onUpdateOrderLocation(foundOrder.id, {
-          lat,
-          lng,
-          mapsUrl,
-          isLiveShared: true,
-          landmark: `Titik GPS Live dari ${foundOrder.customerName}`
-        });
-        setIsSharingLocation(false);
-        setShareSuccessMsg(`✓ Titik koordinat GPS (${lat}, ${lng}) berhasil dibagikan ke Kurir Soleman!`);
-        setFoundOrder(prev => prev ? {
-          ...prev,
-          location: {
-            ...prev.location,
-            lat,
-            lng,
-            mapsUrl,
-            isLiveShared: true
-          }
-        } : null);
-      },
-      () => {
-        setIsSharingLocation(false);
-        setShareSuccessMsg('Gagal membaca koordinat. Mohon izinkan akses lokasi GPS pada browser.');
-      },
-      { enableHighAccuracy: true, timeout: 9000 }
-    );
   };
 
   const steps = [
@@ -391,26 +347,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </span>
                   </div>
                 </div>
-
-                {/* Location Sharing Action for Customer */}
-                {onUpdateOrderLocation && (foundOrder.status === 'menunggu_jemput' || foundOrder.status === 'perjalanan_workshop') && (
-                  <div className="pt-2 border-t border-slate-800 space-y-1.5">
-                    <button
-                      type="button"
-                      onClick={handleShareGpsToCourier}
-                      disabled={isSharingLocation}
-                      className="w-full py-2 px-3 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <MapPin className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>{isSharingLocation ? 'Membaca GPS...' : '📍 Bagikan / Perbarui Titik Lokasi GPS ke Kurir'}</span>
-                    </button>
-                    {shareSuccessMsg && (
-                      <p className="text-[10px] text-cyan-300 font-medium text-center">
-                        {shareSuccessMsg}
-                      </p>
-                    )}
-                  </div>
-                )}
               </div>
 
             </div>
@@ -457,7 +393,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </a>
 
               <button
-                onClick={() => { setFoundOrder(null); setSearchQuery(''); setHasSearched(false); setShareSuccessMsg(''); }}
+                onClick={() => { setFoundOrder(null); setSearchQuery(''); setHasSearched(false); }}
                 className="px-5 py-3 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
               >
                 Lacak Order Lain
