@@ -9,6 +9,7 @@ import { WORKSHOP_INFO, STATUS_LABELS, SERVICES_CATALOG, getServiceTierDetail } 
 interface CompactShoePayload {
   b: string; // shoeBrand
   t: ShoeType; // shoeType
+  sz?: string; // shoeSize
   m: string; // material
   v: DamageSeverity; // severity
   s: string[]; // service IDs
@@ -48,6 +49,7 @@ export function encodeOrderForCourierLink(order: Order): string {
         ? order.shoes.map((sh) => ({
             b: sh.shoeBrand,
             t: sh.shoeType,
+            sz: sh.shoeSize,
             m: sh.material,
             v: sh.severity,
             s: sh.selectedServices.map((srv) => srv.id),
@@ -58,6 +60,7 @@ export function encodeOrderForCourierLink(order: Order): string {
             {
               b: order.shoeBrand,
               t: order.shoeType,
+              sz: order.shoeSize,
               m: order.material || 'Canvas / Kain',
               v: order.severity || 'normal',
               s: order.selectedServices.map((srv) => srv.id),
@@ -116,6 +119,7 @@ export function decodeOrderFromCourierLink(token: string, courierName: string = 
         pairNumber: idx + 1,
         shoeBrand: sh.b || `Sepatu #${idx + 1}`,
         shoeType: sh.t || 'Sneakers',
+        shoeSize: sh.sz,
         material: (sh.m as any) || 'Canvas / Kain',
         severity: sh.v || 'normal',
         selectedServices: finalServices,
@@ -138,6 +142,7 @@ export function decodeOrderFromCourierLink(token: string, courierName: string = 
       customerPhone: data.p,
       shoeBrand: summaryBrand,
       shoeType: shoes[0]?.shoeType || 'Sneakers',
+      shoeSize: shoes[0]?.shoeSize,
       material: shoes[0]?.material || 'Canvas / Kain',
       severity: shoes[0]?.severity || 'normal',
       pairsCount: data.c || shoes.length || 1,
@@ -167,7 +172,7 @@ export function decodeOrderFromCourierLink(token: string, courierName: string = 
       status: 'menunggu_jemput',
       isAcceptedByAdmin: false,
       assignedCourier: courierName,
-      assignedCourierPhone: '08814519955',
+      assignedCourierPhone: '083152276387',
       createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
       estimatedFinishedAt: '1 - 3 Hari Kerja',
       technicianName: 'Master Teknisi Soleman',
@@ -254,6 +259,7 @@ export function parseWhatsAppOrderTextToOrder(
     shoeBlocks.forEach((block, idx) => {
       const firstLine = block.split('\n')[0]?.trim() || `Sepatu #${idx + 1}`;
       const catMatch = block.match(/Kategori:\s*([^\n\r*]+)/i);
+      const sizeMatch = block.match(/Ukuran(?:\s*Sepatu|\s*Tapak)?:\s*\*?([^\n\r*]+)/i);
       const matMatch = block.match(/Bahan Material:\s*\*?([^\n\r*]+)/i);
       const subShoeMatch = block.match(/Subtotal Sepatu\s*#\d+:\s*\*?Rp\s*([0-9.]+)/i);
 
@@ -274,6 +280,7 @@ export function parseWhatsAppOrderTextToOrder(
         pairNumber: idx + 1,
         shoeBrand: firstLine.replace(/\*/g, '').trim(),
         shoeType: (catMatch ? catMatch[1].trim() : 'Sneakers') as ShoeType,
+        shoeSize: sizeMatch ? sizeMatch[1].replace(/EU/i, '').trim() : undefined,
         material: (matMatch ? matMatch[1].trim() : 'Canvas / Kain') as any,
         severity: sev,
         selectedServices: finalServices,
@@ -326,12 +333,13 @@ export function parseWhatsAppOrderTextToOrder(
   const order: Order = {
     id: orderId,
     customerName: customerName || 'Pelanggan WA Soleman',
-    customerPhone: customerPhone || '08814519955',
+    customerPhone: customerPhone || '083152276387',
     shoeBrand:
       parsedShoes.length === 1
         ? parsedShoes[0].shoeBrand
         : `${parsedShoes[0].shoeBrand} (+${parsedShoes.length - 1} psg lain)`,
     shoeType: parsedShoes[0].shoeType,
+    shoeSize: parsedShoes[0].shoeSize,
     material: parsedShoes[0].material,
     severity: parsedShoes[0].severity,
     pairsCount: Math.max(pairsCountFromText, parsedShoes.length),
@@ -360,7 +368,7 @@ export function parseWhatsAppOrderTextToOrder(
     status: 'menunggu_jemput',
     isAcceptedByAdmin: false,
     assignedCourier: courierName,
-    assignedCourierPhone: '08814519955',
+    assignedCourierPhone: '083152276387',
     createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
     estimatedFinishedAt: '1 - 3 Hari Kerja',
     technicianName: 'Master Teknisi Soleman',
@@ -391,7 +399,7 @@ export function buildNewOrderWhatsAppUrl(order: Order): string {
       }).join('');
       return `👟 *SEPATU #${idx + 1}:* ${sh.shoeBrand}
   • Kategori: ${sh.shoeType}
-  • Bahan Material: *${sh.material}*
+  ${sh.shoeSize ? `• Ukuran Sepatu: *EU ${sh.shoeSize}*\n  ` : ''}• Bahan Material: *${sh.material}*
   • Tingkat Kerusakan: *${sevLabel}*
   • Rincian Kerusakan & Harga:${sList}
   ${sh.damageNotes ? `• Keluhan Khusus: _"${sh.damageNotes}"_\n  ` : ''}• Subtotal Sepatu #${idx + 1}: *Rp ${sh.price.toLocaleString('id-ID')}*`;
@@ -408,7 +416,7 @@ export function buildNewOrderWhatsAppUrl(order: Order): string {
     shoesDetailText = `👟 *DATA SEPATU:*
 - Merk/Model: *${order.shoeBrand}*
 - Kategori: ${order.shoeType}
-${order.material ? `- Bahan Material: ${order.material}\n` : ''}- Tingkat Kerusakan: *${sevLabel}*
+${order.shoeSize ? `- Ukuran Sepatu: *EU ${order.shoeSize}*\n` : ''}${order.material ? `- Bahan Material: ${order.material}\n` : ''}- Tingkat Kerusakan: *${sevLabel}*
 - Jumlah: ${order.pairsCount} Pasang
 ${order.customNotes ? `- Keluhan/Catatan: _"${order.customNotes}"_` : ''}
 
@@ -431,11 +439,18 @@ ${serviceList}`;
       ? `🛵 *Logistik Pengantaran:* Mitra GrabExpress / Maxim Delivery & Kurir Soleman (Radius Kabupaten)`
       : `🛵 *Logistik Pengantaran:* Kurir Internal Soleman (Area Dekat / Kota Cirebon)`;
 
+  const gpsText = order.location.lat && order.location.lng
+    ? `\n📌 *Titik GPS Akurat:* ${order.location.lat.toFixed(6)}, ${order.location.lng.toFixed(6)}`
+    : '';
+  const mapsPinUrl = order.location.mapsUrl || (order.location.lat && order.location.lng ? `https://www.google.com/maps?q=${order.location.lat},${order.location.lng}` : '');
+  const mapsShareLine = mapsPinUrl ? `\n🗺️ *Link Share-Loc Kurir:* ${mapsPinUrl}` : '';
+
   const locationText = order.pickupType === 'drop_off'
     ? `🏢 *Metode:* Drop-off Langsung ke Workshop Soleman (Jl. Sukalila Selatan Cirebon)`
     : `${logisticsLabel}
-📍 *Titik Lokasi Pelanggan:* ${order.customerName} (Kec. ${order.location.areaName})
-⏰ *Jadwal Jemput:* Sesi ${order.preferredTimeSlot.toUpperCase()}`;
+📍 *Wilayah Pelanggan:* ${order.customerName} (Kec. ${order.location.areaName})
+🏠 *Alamat / Patokan:* ${order.location.fullAddress || order.location.landmark || '-'}
+⏰ *Jadwal Jemput:* Sesi ${order.preferredTimeSlot.toUpperCase()}${gpsText}${mapsShareLine}`;
 
   const photoNote = (order.photos && order.photos.length > 0) || order.photoUrl
     ? `📸 *FOTO SEPATU RUSAK:* Sudah terunggah di sistem & saya siap kirim foto tambahan ke chat ini agar admin mudah cek kondisinya.${photoConfirmText}`
@@ -485,7 +500,7 @@ export function buildStatusNotificationWhatsAppUrl(
   targetStatus: OrderStatus,
   customDriverNote?: string
 ): string {
-  const statusInfo = STATUS_LABELS[targetStatus];
+  const statusInfo = STATUS_LABELS[targetStatus] || { label: targetStatus };
   let cleanPhone = order.customerPhone.replace(/[^0-9]/g, '');
   if (cleanPhone.startsWith('0')) {
     cleanPhone = '62' + cleanPhone.slice(1);
@@ -513,6 +528,9 @@ export function buildStatusNotificationWhatsAppUrl(
     case 'selesai':
       statusDescription = `✅ *Servis Selesai:* Sepatu telah diserahterimakan dengan baik. Garansi resmi servis Soleman Cirebon aktif.`;
       break;
+    case 'dibatalkan':
+      statusDescription = `❌ *Pesanan Dibatalkan (${order.cancellationReason || 'Stok Tapak / Bahan Sedang Kosong'}):* Mohon maaf Kak, stok tapak/bahan atau ukuran untuk pesanan ini sedang kosong di workshop sehingga pesanan dibatalkan sementara.`;
+      break;
   }
 
   const paymentText = order.paymentMethod === 'cod'
@@ -525,20 +543,50 @@ Halo Kak *${order.customerName}*!
 Berikut kabar terbaru mengenai sepatu Anda:
 
 📌 *No. Order:* #${order.id}
-👟 *Sepatu:* ${order.shoeBrand} (${order.pairsCount} pasang)
+👟 *Sepatu:* ${order.shoeBrand} (${order.pairsCount} pasang)${order.shoeSize ? ` — Ukuran EU ${order.shoeSize}` : ''}
 ⚡ *Status Terkini:* *${statusInfo.label.toUpperCase()}*
 
 📢 *Keterangan Progres:*
 ${statusDescription}
 ${customDriverNote ? `\n📝 *Catatan Kurir/Teknisi:* "${customDriverNote}"` : ''}
 
-📍 *Alamat:* ${order.location.fullAddress}
+📍 *Alamat:* ${order.location.fullAddress || order.location.areaName}
 ${order.location.mapsUrl ? `🗺️ *Titik Antar-Jemput:* ${order.location.mapsUrl}` : ''}
 💰 *Total Biaya:* Rp ${order.totalAmount.toLocaleString('id-ID')}
 ${paymentText}
 
 Jika ada pertanyaan, langsung balas pesan ini ya Kak.
 *Soleman Cirebon* - _Perbaikan Sepatu Terlengkap & Presisi_`;
+
+  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+}
+
+/**
+ * Link WhatsApp khusus pembatalan pesanan akibat Stok Kosong
+ */
+export function buildOutOfStockCancelWhatsAppUrl(order: Order, reason?: string): string {
+  let cleanPhone = order.customerPhone.replace(/[^0-9]/g, '');
+  if (cleanPhone.startsWith('0')) {
+    cleanPhone = '62' + cleanPhone.slice(1);
+  } else if (!cleanPhone.startsWith('62')) {
+    cleanPhone = '62' + cleanPhone;
+  }
+
+  const cancelReason = reason || order.cancellationReason || 'Stok tapak / ukuran sepatu sedang kosong di workshop';
+  const sizeNote = order.shoeSize ? ` (Ukuran EU ${order.shoeSize})` : '';
+  const message = `*PEMBERITAHUAN PEMBATALAN PESANAN - SOLEMAN CIREBON* 🙏👟
+
+Halo Kak *${order.customerName}*,
+Mohon maaf sebesar-besarnya atas ketidaknyamanannya. Terkait pesanan Anda:
+
+📌 *No. Order:* #${order.id}
+👟 *Sepatu/Sandal:* ${order.shoeBrand}${sizeNote}
+🛠️ *Layanan:* ${order.selectedServices.map(s => s.name).join(', ')}
+
+Dengan berat hati pesanan ini *DIBATALKAN* dengan alasan:
+❌ *${cancelReason}*
+
+Jika Kakak berkenan menunggu restock atau ingin mengganti model tapak/menu lain, silakan balas chat ini ya Kak agar kami bantu rekomendasikan alternatif terbaik. Terima kasih atas pengertiannya! 🙏`;
 
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }
@@ -574,9 +622,9 @@ Halo Kak *${order.customerName}*!
 Permintaan servis & antar-jemput sepatu Kakak telah *DITERIMA & DIKONFIRMASI* oleh Admin Workshop Soleman.
 
 📋 *No. Order:* #${order.id}
-👟 *Sepatu:* ${order.shoeBrand} (${order.pairsCount} pasang)
+👟 *Sepatu:* ${order.shoeBrand} (${order.pairsCount} pasang)${order.shoeSize ? ` — Ukuran EU ${order.shoeSize}` : ''}
 🛠️ *Layanan:* ${order.selectedServices.map(s => s.name).join(', ')}
-🛵 *Kurir Ditugaskan:* ${courierName} (No. WA: 0881-4519-955)
+🛵 *Kurir Ditugaskan:* ${courierName} (No. WA: 0831-5227-6387)
 ⏰ *Sesi Jemput:* ${order.preferredTimeSlot.toUpperCase()}
 💳 *Pembayaran:* ${paymentText}
 
@@ -594,7 +642,7 @@ Mohon pastikan sepatu sudah siap saat Kurir Soleman tiba ya Kak. Terima kasih ba
 /**
  * Link WhatsApp untuk Admin membagikan tugas penjemputan ke Kurir Soleman
  */
-export function buildNotifyCourierWhatsAppUrl(order: Order, courierPhone: string = '08814519955', courierName: string = 'Kurir Soleman'): string {
+export function buildNotifyCourierWhatsAppUrl(order: Order, courierPhone: string = '083152276387', courierName: string = 'Kurir Soleman'): string {
   let cleanPhone = courierPhone.replace(/[^0-9]/g, '');
   if (cleanPhone.startsWith('0')) {
     cleanPhone = '62' + cleanPhone.slice(1);

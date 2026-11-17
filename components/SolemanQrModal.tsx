@@ -42,8 +42,8 @@ export const SolemanQrModal: React.FC<SolemanQrModalProps> = ({
   const [qrDataUrl, setQrDataUrl] = useState<string>('/soleman-dana-qr.svg');
   const [selectedNominal, setSelectedNominal] = useState<number | undefined>(initialNominal);
 
-  const danaPhoneNumber = WORKSHOP_INFO.phoneFormatted; // 0881-4519-955
-  const rawDanaNumber = WORKSHOP_INFO.phone; // 628814519955
+  const danaPhoneNumber = WORKSHOP_INFO.phoneFormatted; // 0831-5227-6387
+  const rawDanaNumber = WORKSHOP_INFO.phone; // 6283152276387
   const danaAccountName = 'SOLEMAN SHOES REPAIR CIREBON';
 
   const nominalPresets = [
@@ -80,7 +80,7 @@ export const SolemanQrModal: React.FC<SolemanQrModalProps> = ({
 
   const handleCopyNumber = () => {
     soundFx.playClick();
-    navigator.clipboard.writeText('08814519955');
+    navigator.clipboard.writeText('083152276387');
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -94,7 +94,7 @@ export const SolemanQrModal: React.FC<SolemanQrModalProps> = ({
 
   const handleShare = async () => {
     soundFx.playClick();
-    const shareText = `Halo! Ini Kode QR Pembayaran Resmi Soleman Shoes Repair Cirebon (0881-4519-955).`;
+    const shareText = `Halo! Ini Kode QR Pembayaran Resmi Soleman Shoes Repair Cirebon (0831-5227-6387).`;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -205,7 +205,7 @@ export const SolemanQrModal: React.FC<SolemanQrModalProps> = ({
             {/* Masked / Full Phone Number Banner */}
             <div className="py-1 px-3 rounded-xl bg-slate-50 border border-slate-100">
               <span className="text-xs font-mono font-bold text-slate-700 tracking-wider">
-                {activeTab === 'dana' ? '62-8814***9955' : 'NMID: ID1024358920192'}
+                {activeTab === 'dana' ? '62-8315***6387' : 'NMID: ID1024358920192'}
               </span>
               <span className="block text-[10px] text-slate-500">
                 Soleman Workshop (Sukalila Selatan)
@@ -338,7 +338,7 @@ export const SolemanQrModal: React.FC<SolemanQrModalProps> = ({
               className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-amber-400" />}
-              <span>{copied ? 'Tersalin: 08814519955' : 'Salin No. DANA'}</span>
+              <span>{copied ? 'Tersalin: 083152276387' : 'Salin No. DANA'}</span>
             </button>
 
             {activeTab !== 'bank' && (

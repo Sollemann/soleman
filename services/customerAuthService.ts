@@ -91,7 +91,7 @@ export const customerAuthService = {
       const newUser: CustomerUser = {
         id: `CUST-${Math.floor(1000 + Math.random() * 9000)}`,
         name: cleanId.includes('@') ? cleanId.split('@')[0] : 'Pelanggan Soleman',
-        phone: cleanId.includes('@') ? '08814519955' : cleanId,
+        phone: cleanId.includes('@') ? '083152276387' : cleanId,
         email: cleanId.includes('@') ? cleanId : undefined,
         createdAt: new Date().toLocaleDateString('id-ID'),
         lastLogin: 'Baru saja',

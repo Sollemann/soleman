@@ -15,12 +15,13 @@ import {
   Tag
 } from 'lucide-react';
 import { SERVICES_CATALOG } from '../data/solcreftData';
-import { DamageSeverity, ServiceItem } from '../types';
+import { DamageSeverity, ServiceItem, ServiceStockItem } from '../types';
 import { soundFx } from '../services/soundEffects';
 
 interface DamageCatalogProps {
   onSelectServiceForPickup: (service: ServiceItem, severity?: DamageSeverity) => void;
   onOpenInstallModal?: () => void;
+  stockMap?: Record<string, ServiceStockItem>;
 }
 
 interface MenuDefinition {
@@ -36,7 +37,7 @@ const SERVICE_MENUS: MenuDefinition[] = [
     id: 'all',
     label: 'Semua Layanan',
     iconText: '📋',
-    description: 'Daftar lengkap 20 layanan reparasi & perawatan sepatu Soleman Sukalila Cirebon',
+    description: 'Daftar lengkap 23 layanan reparasi & perawatan sepatu/sandal Soleman Sukalila Cirebon',
     categoryFilter: () => true
   },
   {
@@ -48,9 +49,9 @@ const SERVICE_MENUS: MenuDefinition[] = [
   },
   {
     id: 'menu-tapak',
-    label: 'Ganti Tapak',
+    label: 'Ganti & Tambal Tapak',
     iconText: '👟',
-    description: 'Ganti outsole baru: sepatu sekolah, pantofel kantor, safety, futsal, trail 200k, gunung Vibram & sandal',
+    description: 'Ganti outsole baru, tambal hak/tumit, & tambal bawah setengah atau full untuk sepatu & sandal',
     categoryFilter: (s) => s.category === 'sol'
   },
   {
@@ -77,7 +78,8 @@ const SERVICE_MENUS: MenuDefinition[] = [
 ];
 
 export const DamageCatalog: React.FC<DamageCatalogProps> = ({
-  onSelectServiceForPickup
+  onSelectServiceForPickup,
+  stockMap
 }) => {
   const [selectedMenuId, setSelectedMenuId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,6 +100,8 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
   });
 
   const handleSelect = (service: ServiceItem) => {
+    const stockEntry = stockMap?.[service.id];
+    if (stockEntry?.isOutOfStock) return;
     soundFx.playClick();
     onSelectServiceForPickup(service, 'normal');
     const el = document.getElementById('antar-jemput');
@@ -184,11 +188,18 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-2">
         {filteredServices.map((service) => {
           const isBest = Boolean(service.isBestMenu);
+          const stockEntry = stockMap?.[service.id];
+          const isOutOfStock = Boolean(stockEntry?.isOutOfStock);
+          const hasEmptySizes = Boolean(stockEntry?.emptySizes && stockEntry.emptySizes.length > 0);
           return (
             <div
               key={service.id}
               onClick={() => handleSelect(service)}
-              className="group bg-slate-900/80 backdrop-blur-sm border border-slate-700/60 hover:border-cyan-400/60 rounded-2xl p-3.5 transition-all duration-200 cursor-pointer flex flex-col justify-between hover:shadow-xl hover:shadow-cyan-950/30 hover:-translate-y-0.5"
+              className={`group bg-slate-900/80 backdrop-blur-sm border rounded-2xl p-3.5 transition-all duration-200 flex flex-col justify-between ${
+                isOutOfStock
+                  ? 'border-rose-500/40 opacity-75 cursor-not-allowed'
+                  : 'border-slate-700/60 hover:border-cyan-400/60 cursor-pointer hover:shadow-xl hover:shadow-cyan-950/30 hover:-translate-y-0.5'
+              }`}
             >
               <div>
                 {/* Dedicated Damage Photo */}
@@ -197,15 +208,21 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
                     src={service.image}
                     alt={service.name}
                     loading="lazy"
-                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                    className={`w-full h-full object-contain transition-transform duration-300 ${isOutOfStock ? 'grayscale opacity-60' : 'group-hover:scale-105'}`}
                   />
                   
                   {/* Badges Overlay */}
                   <div className="absolute top-1.5 left-1.5 flex flex-wrap gap-1">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-950/85 backdrop-blur-sm text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
-                      {isBest && <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />}
-                      {isBest ? 'Paling Populer' : getCategoryLabel(service.category)}
-                    </span>
+                    {isOutOfStock ? (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-rose-600 text-white border border-rose-400 shadow-md">
+                        STOK KOSONG
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-950/85 backdrop-blur-sm text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                        {isBest && <Flame className="w-3 h-3 text-amber-400 fill-amber-400" />}
+                        {isBest ? 'Paling Populer' : getCategoryLabel(service.category)}
+                      </span>
+                    )}
                   </div>
 
                   <div className="absolute top-1.5 right-1.5">
@@ -215,11 +232,21 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
                     </span>
                   </div>
 
-                  {/* Warranty Badge Bottom */}
+                  {/* Warranty / Empty Size Badge Bottom */}
                   <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 flex-wrap">
-                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/90 backdrop-blur-sm text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-emerald-400" /> Garansi {service.warrantyDays} Hari
-                    </span>
+                    {isOutOfStock ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-950/95 text-rose-200 border border-rose-500/40">
+                        {stockEntry?.note || 'Bahan / tapak sementara kosong'}
+                      </span>
+                    ) : hasEmptySizes ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-950/95 text-amber-300 border border-amber-500/40">
+                        Size Kosong: EU {stockEntry?.emptySizes.join(', ')}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-950/90 backdrop-blur-sm text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" /> Garansi {service.warrantyDays} Hari
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -248,14 +275,19 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
                 </div>
                 <button
                   type="button"
+                  disabled={isOutOfStock}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleSelect(service);
                   }}
-                  className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-md shadow-cyan-500/20"
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
+                    isOutOfStock
+                      ? 'bg-rose-950/60 text-rose-300 border border-rose-500/40 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 cursor-pointer shadow-md shadow-cyan-500/20'
+                  }`}
                 >
-                  <span>Pilih</span>
-                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>{isOutOfStock ? 'Stok Kosong' : 'Pilih'}</span>
+                  {!isOutOfStock && <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />}
                 </button>
               </div>
             </div>

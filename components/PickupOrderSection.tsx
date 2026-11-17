@@ -19,24 +19,21 @@ import {
   Layers, 
   Sparkles, 
   QrCode, 
-  Search,
-  Navigation,
   Crosshair,
-  Zap,
   Check
 } from 'lucide-react';
 import { 
   SERVICES_CATALOG, 
   CIREBON_AREAS, 
-  ALL_CIREBON_KECAMATAN_SUGGESTIONS,
   KOTA_CIREBON_KECAMATAN,
   WORKSHOP_INFO, 
+  SHOE_SIZES,
+  isTapakOrSoleSizeRequired,
   calculateDistanceToWorkshop,
   calculateServicePrice,
   getServiceTierDetail,
   findClosestCirebonArea
 } from '../data/solcreftData';
-import { SolemanQrModal } from './SolemanQrModal';
 import { 
   ServiceItem, 
   ShoeType, 
@@ -45,9 +42,11 @@ import {
   Order, 
   ShoeItemDetail, 
   PaymentMethod,
-  CustomerUser
+  CustomerUser,
+  ServiceStockItem
 } from '../types';
-import { buildNewOrderWhatsAppUrl } from '../services/whatsappHelper';
+import { buildNewOrderWhatsAppUrl, parseShareLocInput } from '../services/whatsappHelper';
+import { isServiceOrSizeOutOfStock } from '../services/firebaseStockService';
 import { soundFx } from '../services/soundEffects';
 
 interface PairFormItem {
@@ -55,6 +54,7 @@ interface PairFormItem {
   pairNumber: number;
   shoeBrand: string;
   shoeType: ShoeType;
+  shoeSize?: string;
   material: ShoeMaterial;
   severity: DamageSeverity;
   serviceIds: string[];
@@ -78,6 +78,8 @@ interface PickupOrderSectionProps {
   initialPairsCount?: number;
   initialArea?: string;
   initialSeverity?: DamageSeverity;
+  initialShoeSize?: string;
+  stockMap?: Record<string, ServiceStockItem>;
   customerUser?: CustomerUser | null;
   onOrderCreated: (order: Order) => void;
   onOpenDashboard: () => void;
@@ -94,7 +96,7 @@ const AVAILABLE_SHOE_TYPES: { id: ShoeType; label: string }[] = [
   { id: 'Sepatu Trail', label: 'Sepatu Trail (Extreme Grip)' },
   { id: 'Sepatu Gunung / Hiking', label: 'Sepatu Gunung / Hiking' },
   { id: 'Sepatu Bola / Cleats', label: 'Sepatu Bola' },
-  { id: 'Sendal Biasa', label: 'Sandal Biasa' },
+  { id: 'Sendal Biasa', label: 'Sandal Biasa / Jepit / Gunung' },
   { id: 'Sendal Kulit', label: 'Sandal Kulit' },
 ];
 
@@ -104,14 +106,15 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   initialPairsCount,
   initialArea,
   initialSeverity,
+  initialShoeSize,
+  stockMap,
   customerUser,
   onOrderCreated,
-  onOpenTrackerWithId
 }) => {
   // Customer Info State
   const [customerName, setCustomerName] = useState(customerUser?.name || '');
   const [customerPhone, setCustomerPhone] = useState(customerUser?.phone || '');
-  const [customerAddress, setCustomerAddress] = useState(customerUser?.defaultAddress || '');
+  const [customerAddress, setCustomerAddress] = useState(customerUser?.savedAddress || '');
   const [pairsCount, setPairsCount] = useState<number>(initialPairsCount || 1);
   const [activePairIndex, setActivePairIndex] = useState<number>(0);
 
@@ -122,6 +125,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       pairNumber: 1,
       shoeBrand: '',
       shoeType: initialShoeType || 'Sneakers',
+      shoeSize: initialShoeSize || '40',
       material: 'Canvas / Kain',
       severity: initialSeverity || 'normal',
       serviceIds: initialServices && initialServices.length > 0 ? initialServices.map(s => s.id) : ['jahit-benang-tersembunyi'],
@@ -132,7 +136,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     }
   ]);
 
-  // Sync external preselection from Catalog
+  // Sync external preselection from Catalog / Calculator
   useEffect(() => {
     if (initialServices && initialServices.length > 0) {
       setShoesList(prev => prev.map((sh, idx) => {
@@ -141,11 +145,14 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             ...sh,
             serviceIds: initialServices.map(s => s.id),
             shoeType: initialShoeType || sh.shoeType,
-            severity: initialSeverity || sh.severity
+            severity: initialSeverity || sh.severity,
+            shoeSize: initialShoeSize || sh.shoeSize || '40',
           };
         }
         return sh;
       }));
+    } else if (initialShoeSize) {
+      setShoesList(prev => prev.map((sh, idx) => idx === 0 ? { ...sh, shoeSize: initialShoeSize } : sh));
     }
     if (initialPairsCount && initialPairsCount > 0) {
       setPairsCount(initialPairsCount);
@@ -153,12 +160,13 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     if (initialArea) {
       setAreaName(initialArea);
     }
-  }, [initialServices, initialShoeType, initialPairsCount, initialArea, initialSeverity]);
+  }, [initialServices, initialShoeType, initialPairsCount, initialArea, initialSeverity, initialShoeSize]);
 
-  // Delivery State: Antar-Jemput Flat 15k or Drop-off 0k
-  const [pickupType, setPickupType] = useState<'antar_jemput' | 'drop_off'>('antar_jemput');
-  const [areaName, setAreaName] = useState<string>(initialArea || 'Kesambi');
+  // Delivery State: Antar-Jemput Kurir Langsung + Bagi Lokasi Akurat
+  const [pickupType] = useState<'antar_jemput' | 'drop_off'>('antar_jemput');
+  const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Kesambi');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [shareLocInput, setShareLocInput] = useState('');
   const [isLocatingGps, setIsLocatingGps] = useState(false);
   const [gpsStatusMsg, setGpsStatusMsg] = useState('');
 
@@ -183,6 +191,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             pairNumber: i,
             shoeBrand: '',
             shoeType: 'Sneakers',
+            shoeSize: '40',
             material: 'Canvas / Kain',
             severity: 'normal',
             serviceIds: ['jahit-benang-tersembunyi'],
@@ -213,6 +222,17 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   };
 
   const toggleServiceForActiveShoe = (serviceId: string) => {
+    const isCurrentlyChecked = activeShoe.serviceIds.includes(serviceId);
+    if (!isCurrentlyChecked) {
+      const checkSrv = SERVICES_CATALOG.find(s => s.id === serviceId);
+      const checkSize = checkSrv && isTapakOrSoleSizeRequired([checkSrv]) ? activeShoe.shoeSize : undefined;
+      const stockCheck = isServiceOrSizeOutOfStock(stockMap, serviceId, checkSize);
+      if (stockCheck.blocked) {
+        setValidationError(stockCheck.reason || 'Menu layanan ini sedang stok kosong.');
+        return;
+      }
+    }
+    setValidationError('');
     soundFx.playClick();
     const currentServices = activeShoe.serviceIds;
     let nextServices: string[];
@@ -319,29 +339,45 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   // Deteksi GPS Koordinat 1-Klik Otomatis & Pemilihan Wilayah Cirebon Terdekat
   const handleDetectGps = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setGpsStatusMsg('Perangkat belum mendukung GPS otomatis.');
+      setGpsStatusMsg('Perangkat belum mendukung GPS otomatis. Silakan tempel link Google Maps di kolom bawah.');
       return;
     }
     setIsLocatingGps(true);
-    setGpsStatusMsg('Mengunci titik koordinat GPS akurat...');
+    setGpsStatusMsg('Mengunci titik koordinat GPS akurat untuk Kurir...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const lat = Number(pos.coords.latitude.toFixed(6));
         const lng = Number(pos.coords.longitude.toFixed(6));
         const dist = calculateDistanceToWorkshop(lat, lng);
         const closest = findClosestCirebonArea(lat, lng);
+        const mapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
         setAreaName(closest.name);
         setGpsCoords({ lat, lng });
+        setShareLocInput(mapsLink);
         setIsLocatingGps(false);
-        setGpsStatusMsg(`✓ GPS Terkunci: ${closest.name} (${closest.type === 'Kota' ? 'GRATIS ONGKIR Kota' : 'Ongkir 15k Kabupaten'}) • ±${dist} KM dari Workshop Sukalila`);
+        setGpsStatusMsg(`✓ Lokasi Akurat Terkunci: ${closest.name} (${closest.type === 'Kota' ? 'GRATIS ONGKIR Kota' : 'Ongkir 15k Kabupaten'}) • ±${dist} KM dari Workshop`);
         soundFx.playSuccess();
       },
       () => {
         setIsLocatingGps(false);
-        setGpsStatusMsg('Izin GPS belum diizinkan. Cukup pilih nama Kecamatan Anda pada pilihan di bawah.');
+        setGpsStatusMsg('Izin GPS belum diizinkan. Anda bisa pilih Kecamatan dan tempel link Google Maps di kolom bawah.');
       },
       { enableHighAccuracy: true, timeout: 9000 }
     );
+  };
+
+  const handleShareLocInputChange = (val: string) => {
+    setShareLocInput(val);
+    const parsed = parseShareLocInput(val);
+    if (parsed.lat && parsed.lng) {
+      const dist = calculateDistanceToWorkshop(parsed.lat, parsed.lng);
+      const closest = findClosestCirebonArea(parsed.lat, parsed.lng);
+      setAreaName(closest.name);
+      setGpsCoords({ lat: parsed.lat, lng: parsed.lng });
+      setGpsStatusMsg(`✓ Titik Maps Terdeteksi: ${closest.name} • ±${dist} KM dari Workshop`);
+    } else if (parsed.cleanUrl) {
+      setGpsStatusMsg('✓ Link Google Maps berhasil terbaca dan akan dikirim akurat ke Kurir.');
+    }
   };
 
   // Calculate pricing
@@ -356,6 +392,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       pairNumber: idx + 1,
       shoeBrand: shoe.shoeBrand || `Sepatu #${idx + 1}`,
       shoeType: shoe.shoeType,
+      shoeSize: isTapakOrSoleSizeRequired(selectedServiceObjs) ? (shoe.shoeSize || '40') : shoe.shoeSize,
       material: shoe.material,
       severity: shoe.severity,
       selectedServices: selectedServiceObjs,
@@ -404,6 +441,26 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       return;
     }
 
+    // Validasi ukuran tapak & stok kosong sebelum submit
+    for (let i = 0; i < shoesList.length; i++) {
+      const sh = shoesList[i];
+      const srvObjs = SERVICES_CATALOG.filter(s => sh.serviceIds.includes(s.id));
+      const needsSz = isTapakOrSoleSizeRequired(srvObjs);
+      if (needsSz && (!sh.shoeSize || !sh.shoeSize.trim())) {
+        setValidationError(`Silakan pilih Ukuran Sepatu / Sandal untuk Sepatu #${i + 1} agar tapak sesuai.`);
+        setActivePairIndex(i);
+        return;
+      }
+      for (const srv of srvObjs) {
+        const check = isServiceOrSizeOutOfStock(stockMap, srv.id, needsSz ? sh.shoeSize : undefined);
+        if (check.blocked) {
+          setValidationError(`Maaf, ${srv.name} pada Sepatu #${i + 1}: ${check.reason}`);
+          setActivePairIndex(i);
+          return;
+        }
+      }
+    }
+
     const allPhotos = shoeDetailsWithPrices
       .map(s => s.photoUrl)
       .filter((url): url is string => Boolean(url));
@@ -417,8 +474,13 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       : `${shoesList[0].shoeBrand} (+${pairsCount - 1} pasang)`;
 
     const cleanArea = areaName.trim() || 'Kesambi';
-    const finalLat = gpsCoords?.lat;
-    const finalLng = gpsCoords?.lng;
+    const parsedShareInput = parseShareLocInput(shareLocInput);
+    const finalLat = gpsCoords?.lat ?? parsedShareInput.lat;
+    const finalLng = gpsCoords?.lng ?? parsedShareInput.lng;
+    const finalMapsUrl = (finalLat && finalLng)
+      ? `https://www.google.com/maps?q=${finalLat},${finalLng}`
+      : parsedShareInput.cleanUrl;
+    const hasSharedLocation = Boolean((finalLat && finalLng) || finalMapsUrl);
 
     const newOrder: Order = {
       id: `SLC-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -427,6 +489,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       customerPhone: customerPhone.trim(),
       shoeBrand: summaryBrand,
       shoeType: shoesList[0].shoeType,
+      shoeSize: shoeDetailsWithPrices[0]?.shoeSize,
       material: shoesList[0].material,
       severity: shoesList[0].severity,
       pairsCount,
@@ -445,12 +508,15 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
         areaType: isKota ? 'Kota' : 'Kabupaten',
         distanceZone: isKota ? 'dekat_kota' : 'jauh_kabupaten',
         logisticsPartner: 'kurir_soleman',
+        shareLocViaWhatsApp: true,
+        isLiveShared: hasSharedLocation,
+        liveSharedAt: hasSharedLocation ? new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : undefined,
         fullAddress: customerAddress.trim() ? `${customerAddress.trim()}, Kec. ${cleanArea}, Cirebon` : `Kec. ${cleanArea}, Cirebon`,
         landmark: customerAddress.trim() || `Titik Lokasi: ${customerName.trim()} (${cleanArea})`,
         lat: finalLat,
         lng: finalLng,
         accuracy: finalLat ? 10 : undefined,
-        mapsUrl: finalLat && finalLng ? `https://www.google.com/maps?q=${finalLat},${finalLng}` : undefined,
+        mapsUrl: finalMapsUrl,
       },
       paymentMethod,
       paymentStatus: paymentMethod === 'cod' ? 'cod_pending' : 'menunggu_pembayaran',
@@ -463,13 +529,13 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       estimatedFinishedAt: '1 - 3 Hari Kerja',
       technicianName: 'Master Teknisi Soleman',
       assignedCourier: 'Kurir Soleman',
-      assignedCourierPhone: '08814519955',
+      assignedCourierPhone: '083152276387',
       timeline: [
         {
           status: 'menunggu_jemput',
           label: 'Pesanan Diterima di Sistem',
           timestamp: 'Baru saja',
-          description: `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()} (${cleanArea}). Siap dijadwalkan ke rute kurir.`
+          description: `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()} (${cleanArea})${hasSharedLocation ? ' dengan titik lokasi GPS akurat' : ''}. Siap dijadwalkan ke rute kurir.`
         }
       ]
     };
@@ -503,52 +569,65 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
         </p>
       </div>
 
-      {/* Success Notification after Order Created - With Instant Auto-Tracking Button */}
+      {/* Success Notification after Order Created */}
       {createdOrder && (
         <div className="mb-8 p-6 rounded-3xl bg-slate-900 border border-cyan-400/60 shadow-[0_0_25px_rgba(0,240,255,0.25)] space-y-4">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-2xl bg-cyan-400 text-slate-950 flex items-center justify-center shrink-0 font-bold shadow-lg shadow-cyan-400/40">
               <CheckCircle2 className="w-7 h-7 stroke-[2.5]" />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">
-                Pesanan Berhasil Dicatat!
+                Pesanan Berhasil Dicatat & Masuk Portal Kurir!
               </span>
               <h3 className="text-xl font-extrabold text-white">
                 Kode Seri Order: #{createdOrder.id}
               </h3>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Pesanan Anda untuk {createdOrder.pairsCount} pasang sepatu atas nama <strong>{createdOrder.customerName}</strong> ({createdOrder.location.areaName}) telah tersimpan. Total: <strong>Rp {createdOrder.totalAmount.toLocaleString('id-ID')}</strong> ({createdOrder.paymentMethod.toUpperCase()}).
+                Pesanan Anda untuk {createdOrder.pairsCount} pasang ({createdOrder.shoeBrand}{createdOrder.shoeSize ? ` • Ukuran EU ${createdOrder.shoeSize}` : ''}) atas nama <strong>{createdOrder.customerName}</strong> di <strong>{createdOrder.location.areaName}</strong> telah tersimpan. Total: <strong>Rp {createdOrder.totalAmount.toLocaleString('id-ID')}</strong> ({createdOrder.paymentMethod.toUpperCase()}).
               </p>
+              {createdOrder.location.mapsUrl ? (
+                <div className="text-[11px] text-emerald-300 font-semibold flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Titik lokasi GPS/Maps sudah terkunci akurat untuk Kurir Soleman.</span>
+                  <a
+                    href={createdOrder.location.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline text-cyan-300 hover:text-white"
+                  >
+                    Lihat Titik Maps
+                  </a>
+                </div>
+              ) : (
+                <p className="text-[11px] text-amber-300">
+                  Alamat patokan: {createdOrder.location.fullAddress}. Kurir akan mengonfirmasi via WhatsApp sebelum meluncur.
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Quick Auto-Track Action Button */}
           <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                if (onOpenTrackerWithId) {
-                  onOpenTrackerWithId(createdOrder.id);
-                }
-              }}
-              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-400/30 transition-all cursor-pointer"
-            >
-              <Search className="w-4 h-4 stroke-[2.5]" />
-              <span>Lacak Status Pesanan #{createdOrder.id} Otomatis</span>
-            </button>
-
             <button
               type="button"
               onClick={() => {
                 const waUrl = buildNewOrderWhatsAppUrl(createdOrder);
                 window.open(waUrl, '_blank');
               }}
+              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
+            >
+              <MessageSquare className="w-4 h-4 stroke-[2.5]" />
+              <span>Kirim Konfirmasi & Share Loc ke WhatsApp (0831-5227-6387)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCreatedOrder(null);
+              }}
               className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all cursor-pointer"
             >
-              <MessageSquare className="w-4 h-4 text-emerald-400" />
-              <span>Buka Chat WhatsApp</span>
+              <span>Tutup / Pesan Lagi</span>
             </button>
           </div>
         </div>
@@ -751,7 +830,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {[
                   { id: 'jahit', label: '🪡 Jahit Sol', cat: (s: ServiceItem) => s.category === 'jahit' },
-                  { id: 'sol', label: '👟 Ganti Tapak', cat: (s: ServiceItem) => s.category === 'sol' },
+                  { id: 'sol', label: '👟 Tapak & Tambal', cat: (s: ServiceItem) => s.category === 'sol' },
                   { id: 'treatment', label: '✨ Treatment', cat: (s: ServiceItem) => s.category === 'warna' || s.category === 'kebersihan' },
                   { id: 'rekonstruksi', label: '🛠️ Busa & Upper', cat: (s: ServiceItem) => s.category === 'busa' || s.category === 'kulit_upper' },
                 ].map((menu) => {
@@ -796,14 +875,21 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                 }).map((serv) => {
                   const isChecked = activeShoe.serviceIds.includes(serv.id);
                   const tier = getServiceTierDetail(serv, activeShoe.severity);
+                  const needsSzForServ = isTapakOrSoleSizeRequired([serv]);
+                  const stockCheck = isServiceOrSizeOutOfStock(stockMap, serv.id, needsSzForServ ? activeShoe.shoeSize : undefined);
+                  const isOut = stockCheck.blocked && !isChecked;
                   return (
                     <div
                       key={serv.id}
-                      onClick={() => toggleServiceForActiveShoe(serv.id)}
-                      className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all text-xs ${
-                        isChecked
-                          ? 'bg-cyan-950/40 border-cyan-400 text-white shadow-[0_0_12px_rgba(0,240,255,0.2)]'
-                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                      onClick={() => {
+                        if (!isOut) toggleServiceForActiveShoe(serv.id);
+                      }}
+                      className={`p-2.5 rounded-xl border flex items-center justify-between transition-all text-xs ${
+                        isOut
+                          ? 'bg-rose-950/20 border-rose-500/30 text-slate-500 opacity-70 cursor-not-allowed'
+                          : isChecked
+                          ? 'bg-cyan-950/40 border-cyan-400 text-white shadow-[0_0_12px_rgba(0,240,255,0.2)] cursor-pointer'
+                          : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
@@ -816,13 +902,69 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                           {serv.name}
                         </span>
                       </div>
-                      <span className="font-black text-cyan-300 text-[11px] shrink-0 font-mono">
-                        {tier.priceFormatted}
-                      </span>
+                      {stockCheck.blocked ? (
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-600 text-white shrink-0">
+                          STOK KOSONG
+                        </span>
+                      ) : (
+                        <span className="font-black text-cyan-300 text-[11px] shrink-0 font-mono">
+                          {tier.priceFormatted}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
               </div>
+
+              {/* Shoe Size Picker whenever a Ganti Tapak / Tambal service is selected */}
+              {isTapakOrSoleSizeRequired(SERVICES_CATALOG.filter(s => activeShoe.serviceIds.includes(s.id))) && (
+                <div className="p-3.5 rounded-xl bg-slate-900/90 border border-cyan-500/35 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-[11px] font-black text-cyan-300">
+                      📏 Pilih Ukuran Sepatu / Sandal (Wajib untuk Ganti Tapak & Tambal):
+                    </label>
+                    <span className="text-[11px] font-mono font-bold text-white bg-cyan-500/20 border border-cyan-400/40 px-2 py-0.5 rounded-lg">
+                      Ukuran: EU {activeShoe.shoeSize || '40'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    {SHOE_SIZES.map((sz) => {
+                      const activeServicesForShoe = SERVICES_CATALOG.filter(s => activeShoe.serviceIds.includes(s.id));
+                      const sizeBlocked = activeServicesForShoe.some(
+                        (srv) => isServiceOrSizeOutOfStock(stockMap, srv.id, sz).blocked
+                      );
+                      const isSel = activeShoe.shoeSize === sz;
+                      return (
+                        <button
+                          key={sz}
+                          type="button"
+                          onClick={() => {
+                            soundFx.playClick();
+                            updateActiveShoe({ shoeSize: sz });
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                            sizeBlocked
+                              ? 'bg-rose-950/40 border-rose-500/40 text-rose-300 line-through'
+                              : isSel
+                              ? 'bg-cyan-400 text-slate-950 border-cyan-300 font-black shadow-sm'
+                              : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-cyan-500/40'
+                          }`}
+                          title={sizeBlocked ? `Stok ukuran EU ${sz} kosong` : `Ukuran EU ${sz}`}
+                        >
+                          {sz}
+                        </button>
+                      );
+                    })}
+                    <input
+                      type="text"
+                      value={activeShoe.shoeSize || ''}
+                      onChange={(e) => updateActiveShoe({ shoeSize: e.target.value })}
+                      placeholder="Lainnya"
+                      className="w-20 px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -856,21 +998,60 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             </span>
           </div>
 
-          {/* Area & GPS Location Selector */}
-          <div className="space-y-2.5 bg-slate-950 p-3.5 rounded-2xl border border-slate-800">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold text-slate-300">
-                  Pilih Wilayah / Kecamatan di Cirebon:
-                </label>
-                <button
-                  type="button"
-                  onClick={handleDetectGps}
-                  disabled={isLocatingGps}
-                  className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-bold cursor-pointer"
-                >
-                  <Crosshair className="w-3 h-3 text-cyan-400" />
-                  <span>{isLocatingGps ? 'Mencari...' : 'Deteksi GPS Saya'}</span>
-                </button>
+          {/* Area & Accurate Location Sharing for Courier */}
+          <div className="space-y-3 bg-slate-950 p-4 rounded-2xl border border-cyan-500/25">
+              {/* Prominent Share Location CTA for Courier */}
+              <div className="p-3 rounded-xl bg-gradient-to-r from-cyan-950/60 to-sky-950/50 border border-cyan-400/40 space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Bagikan Lokasi Akurat agar Kurir Langsung Tepat ke Rumah</span>
+                    </span>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      Klik tombol di samping untuk mengunci titik GPS rumah Anda, atau tempel link Google Maps.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDetectGps}
+                    disabled={isLocatingGps}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer shrink-0"
+                  >
+                    <Crosshair className="w-4 h-4 stroke-[2.5]" />
+                    <span>{isLocatingGps ? 'Mengunci GPS...' : gpsCoords ? '📍 Perbarui Titik GPS Saya' : '📍 Bagikan Lokasi GPS Saya'}</span>
+                  </button>
+                </div>
+
+                {gpsStatusMsg && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-emerald-300 bg-emerald-950/40 px-3 py-2 rounded-lg border border-emerald-500/30">
+                    <span>{gpsStatusMsg}</span>
+                    {(gpsCoords || parseShareLocInput(shareLocInput).cleanUrl) && (
+                      <a
+                        href={gpsCoords ? `https://www.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}` : parseShareLocInput(shareLocInput).cleanUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-cyan-300 hover:text-white font-bold underline shrink-0"
+                      >
+                        <MapPin className="w-3 h-3" />
+                        <span>Cek Titik Maps</span>
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                    Atau Tempel Link Share-Loc / Google Maps (Opsional):
+                  </label>
+                  <input
+                    type="text"
+                    value={shareLocInput}
+                    onChange={(e) => handleShareLocInputChange(e.target.value)}
+                    placeholder="Tempel link Maps rumah (contoh: https://maps.app.goo.gl/... atau -6.715, 108.552)"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none font-mono placeholder:font-sans placeholder:text-slate-600"
+                  />
+                </div>
               </div>
 
               {/* Dynamic Ongkir Status Banner */}
@@ -892,43 +1073,31 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                 </span>
               </div>
 
-              {gpsStatusMsg && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[10px] text-cyan-300 bg-cyan-950/30 px-3 py-1.5 rounded-lg border border-cyan-500/20">
-                  <span>{gpsStatusMsg}</span>
-                  {gpsCoords && (
-                    <a
-                      href={`https://www.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-cyan-400 hover:text-white font-bold underline shrink-0"
-                    >
-                      <MapPin className="w-3 h-3" />
-                      <span>Buka Titik Pin Maps</span>
-                    </a>
-                  )}
-                </div>
-              )}
-
-              <select
-                value={areaName}
-                onChange={(e) => setAreaName(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none transition-colors"
-              >
-                <optgroup label="── KOTA CIREBON (GRATIS ONGKIR Rp 0) ──">
-                  {CIREBON_AREAS.filter(a => a.type === 'Kota').map((a) => (
-                    <option key={a.name} value={a.name}>
-                      {a.name} — GRATIS ONGKIR
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="── KABUPATEN CIREBON (ONGKIR 15k) ──">
-                  {CIREBON_AREAS.filter(a => a.type === 'Kabupaten').map((a) => (
-                    <option key={a.name} value={a.name}>
-                      {a.name} — Ongkir 15k
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                  Pilih Wilayah / Kecamatan di Cirebon:
+                </label>
+                <select
+                  value={areaName}
+                  onChange={(e) => setAreaName(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none transition-colors"
+                >
+                  <optgroup label="── KOTA CIREBON (GRATIS ONGKIR Rp 0) ──">
+                    {CIREBON_AREAS.filter(a => a.type === 'Kota').map((a) => (
+                      <option key={a.name} value={a.name}>
+                        {a.name} — GRATIS ONGKIR
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="── KABUPATEN CIREBON (ONGKIR 15k) ──">
+                    {CIREBON_AREAS.filter(a => a.type === 'Kabupaten').map((a) => (
+                      <option key={a.name} value={a.name}>
+                        {a.name} — Ongkir 15k
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
 
               {/* Input Alamat Lengkap & Patokan Rumah */}
               <div>

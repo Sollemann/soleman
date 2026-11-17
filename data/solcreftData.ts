@@ -8,8 +8,8 @@ import { ServiceItem, CirebonArea, Order, ShoeMaterial, DamageSeverity, Severity
 export const WORKSHOP_INFO = {
   name: 'Soleman',
   tagline: 'Perbaikan & Perawatan Sepatu Terlengkap di Cirebon',
-  phone: '628814519955',
-  phoneFormatted: '0881-4519-955',
+  phone: '6283152276387',
+  phoneFormatted: '0831-5227-6387',
   address: 'Jl. Sukalila Selatan, Pekalangan, Kec. Pekalipan, Kota Cirebon, Jawa Barat 45118',
   landmark: 'Kawasan Sukalila Selatan (Dekat Karanggetas & Pasar Pagi PGC Cirebon)',
   lat: -6.7175,
@@ -18,7 +18,7 @@ export const WORKSHOP_INFO = {
   operatingHours: 'Setiap Hari: 09.00 - 21.00 WIB',
   instagram: '@soleman.cirebon',
   coverage: 'Melayani Antar-Jemput Seluruh Kota Cirebon & Kabupaten Cirebon',
-  danaNumber: '0881-4519-955',
+  danaNumber: '0831-5227-6387',
   danaName: 'SOLEMAN SHOES REPAIR',
 };
 
@@ -873,6 +873,159 @@ export const SERVICES_CATALOG: ServiceItem[] = [
     }
   },
 
+  // --- TAMBAL HAK / TUMIT & TAMBAL BAWAH (SEPATU & SANDAL) ---
+  {
+    id: 'tambal-hak-tumit',
+    name: 'Tambal Hak / Tumit (Sepatu & Sandal)',
+    category: 'sol',
+    damageTitle: 'Hak / Tumit Sepatu atau Sandal Aus Miring, Gerowong, atau Licin',
+    symptoms: [
+      'Bagian tumit / hak sepatu kantor, sneakers, atau sandal terkikis miring sebelah',
+      'Karet hak lepas atau bolong di area tumit belakang',
+      'Jalan terasa tidak seimbang dan berbunyi keras di lantai keramik'
+    ],
+    solution: 'Perataan ulang bidang tumit (leveling), penambalan dengan karet kompon keras anti-aus & silent heel pad untuk sepatu maupun sandal agar kembali tegak presisi.',
+    price: 35000,
+    priceFormatted: 'Rp 35.000',
+    durationEst: '1 Hari',
+    warrantyDays: 45,
+    popular: true,
+    suitableShoes: ['Sepatu Kantor / Pantofel', 'Pantofel / Formal', 'Sneakers', 'Sepatu Sekolah', 'Boots / Safety', 'Sendal Kulit', 'Sendal Biasa', 'Heels / Flat Shoes'],
+    iconName: 'Layers',
+    beforeAfterDescription: 'Hak tumit sepatu & sandal kembali rata seimbang, tidak miring, dan kesat anti licin.',
+    image: '/assets/aistudio/image_1905198b_1__8eadd965.jpg',
+    severityTiers: {
+      kecil: {
+        severity: 'kecil',
+        label: 'Ringan / Tambal Karet Hak Tipis',
+        badge: 'Ringan',
+        damageDesc: 'Aus ringan di sisi tepi hak belakang sepatu/sandal (< 5mm), diratakan & ditambal karet anti-slip.',
+        price: 25000,
+        priceFormatted: 'Rp 25.000',
+        durationEst: '1 Hari'
+      },
+      normal: {
+        severity: 'normal',
+        label: 'Sedang / Ganti & Tambal Hak Kanan-Kiri',
+        badge: 'Sedang',
+        damageDesc: 'Tumit aus miring cukup dalam pada sepatu atau sandal kanan-kiri, diratakan + pasang karet hak baru.',
+        price: 35000,
+        priceFormatted: 'Rp 35.000',
+        durationEst: '1 Hari'
+      },
+      hard: {
+        severity: 'hard',
+        label: 'Berat / Rekonstruksi Block Hak Tebal',
+        badge: 'Berat',
+        damageDesc: 'Hak tumit gerowong parah hingga ke midsole atau blok hak pantofel/sandal pecah, bangun ulang + jahit kunci.',
+        price: 50000,
+        priceFormatted: 'Rp 50.000',
+        durationEst: '1 - 2 Hari'
+      }
+    }
+  },
+  {
+    id: 'tambal-bawah-setengah',
+    name: 'Tambal Bawah Setengah Sol / Half-Sole (Sepatu & Sandal)',
+    category: 'sol',
+    damageTitle: 'Tapak Bawah Depan atau Belakang Menipis Licin (Sebagian Area)',
+    symptoms: [
+      'Area telapak depan (ball area) atau tumit sepatu/sandal sudah halus licin',
+      'Ingin melapisi setengah bagian bawah tanpa membongkar sol asli pabrik',
+      'Tapak asli masih kokoh namun butuh grip karet baru di bagian tumpuan'
+    ],
+    solution: 'Pemasangan lembaran karet half-sole bertekstur grip tajam pada bagian bawah depan atau belakang sepatu & sandal dengan gerinda perata, primer PU, dan press rapi.',
+    price: 45000,
+    priceFormatted: 'Rp 45.000',
+    durationEst: '1 Hari',
+    warrantyDays: 60,
+    popular: true,
+    suitableShoes: ['Sneakers', 'Sepatu Sekolah', 'Sepatu Kantor / Pantofel', 'Pantofel / Formal', 'Running / Sport', 'Sendal Kulit', 'Sendal Biasa', 'Canvas / Casual'],
+    iconName: 'ShieldCheck',
+    beforeAfterDescription: 'Separuh tapak bawah terlapis karet baru yang kesat & tahan gesekan tanpa mengubah bentuk asli.',
+    image: '/assets/aistudio/image_29850b34_bc32f802.jpg',
+    severityTiers: {
+      kecil: {
+        severity: 'kecil',
+        label: 'Ringan / Lapis Setengah Depan / Tumit Tipis',
+        badge: 'Ringan',
+        damageDesc: 'Penambalan karet anti-slip tipis pada bagian depan atau tumit sepatu/sandal yang mulai licin.',
+        price: 35000,
+        priceFormatted: 'Rp 35.000',
+        durationEst: '1 Hari'
+      },
+      normal: {
+        severity: 'normal',
+        label: 'Sedang / Tambal Setengah Sol Karet Tebal',
+        badge: 'Sedang',
+        damageDesc: 'Lapis karet setengah sol (front/back half-sole) kanan-kiri sepasang sepatu/sandal + lem press PU.',
+        price: 45000,
+        priceFormatted: 'Rp 45.000',
+        durationEst: '1 Hari'
+      },
+      hard: {
+        severity: 'hard',
+        label: 'Berat / Tambal Setengah Sol + Jahit Pengunci',
+        badge: 'Berat',
+        damageDesc: 'Area bawah bolong sebagian, tambal penutup lubang + lapis karet half-sole tebal + jahit pengunci.',
+        price: 60000,
+        priceFormatted: 'Rp 60.000',
+        durationEst: '1 - 2 Hari'
+      }
+    }
+  },
+  {
+    id: 'tambal-bawah-semua',
+    name: 'Tambal Bawah Full / Semuanya (Sepatu & Sandal)',
+    category: 'sol',
+    damageTitle: 'Seluruh Permukaan Tapak Bawah Licin, Tipis, atau Mulai Terkikis Rata',
+    symptoms: [
+      'Seluruh bagian tapak bawah sepatu maupun sandal sudah botak dari ujung depan ke tumit',
+      'Midsole asli masih bagus dan sayang diganti total',
+      'Butuh pelapisan karet penuh 100% permukaan bawah agar awet & anti terpeleset'
+    ],
+    solution: 'Resurfacing & penambalan penuh seluruh permukaan bawah sepatu atau sandal dari toe ke heel dengan lembaran karet solid vulcanized anti-slip + press merata + opsi jahit tepi.',
+    price: 70000,
+    priceFormatted: 'Rp 70.000',
+    durationEst: '1 - 2 Hari',
+    warrantyDays: 60,
+    popular: true,
+    isBestMenu: true,
+    suitableShoes: ['Sneakers', 'Sepatu Sekolah', 'Sepatu Kantor / Pantofel', 'Boots / Safety', 'Running / Sport', 'Sendal Kulit', 'Sendal Biasa', 'Canvas / Casual'],
+    iconName: 'Layers',
+    beforeAfterDescription: 'Seluruh tapak bawah sepatu & sandal tertutup karet baru full ujung ke tumit, tebal, rapi, dan super kesat.',
+    image: '/assets/aistudio/image_eb4eb870_25bb97cc.jpg',
+    severityTiers: {
+      kecil: {
+        severity: 'kecil',
+        label: 'Ringan / Lapis Karet Full Tipis (2mm)',
+        badge: 'Ringan',
+        damageDesc: 'Seluruh tapak bawah masih rata tetapi licin, dilapisi karet sheet 2mm full ujung ke tumit sepasang.',
+        price: 55000,
+        priceFormatted: 'Rp 55.000',
+        durationEst: '1 Hari'
+      },
+      normal: {
+        severity: 'normal',
+        label: 'Sedang / Tambal Bawah Full Karet Tebal (4mm)',
+        badge: 'Sedang',
+        damageDesc: 'Pelapisan penuh seluruh permukaan bawah sepatu/sandal memakai karet berpola grip tebal + press PU.',
+        price: 70000,
+        priceFormatted: 'Rp 70.000',
+        durationEst: '1 - 2 Hari'
+      },
+      hard: {
+        severity: 'hard',
+        label: 'Berat / Tambal Full + Isi Bolong + Jahit Keliling',
+        badge: 'Berat',
+        damageDesc: 'Tapak bawah aus dalam/bolong merata, dempul perata alas + tambal full karet tebal + jahit keliling.',
+        price: 95000,
+        priceFormatted: 'Rp 95.000',
+        durationEst: '2 Hari'
+      }
+    }
+  },
+
   // --- REGLUE & LAINNYA ---
   {
     id: 'reglue-total',
@@ -1279,9 +1432,19 @@ export function calculateServicePrice(
   return Math.round(raw / 5000) * 5000;
 }
 
+export const SHOE_SIZES = ['35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'] as const;
+
+export function isTapakOrSoleSizeRequired(services: ServiceItem[]): boolean {
+  return services.some(
+    (s) =>
+      s.category === 'sol' &&
+      (s.id.startsWith('ganti-tapak') || s.id.startsWith('tambal-'))
+  );
+}
+
 export const COURIER_DRIVERS: CourierDriver[] = [
-  { id: 'c1', name: 'Kurir Soleman (Armada Cirebon Kota)', phone: '08814519955', vehicle: 'Honda Vario Hitam (E 4521 AA)', coverageAreas: ['Kesambi', 'Kedawung', 'Pekalipan', 'Kejaksan', 'Harjamukti', 'Lemahwungkuk'] },
-  { id: 'c2', name: 'Kurir Soleman (Armada Kabupaten Cirebon)', phone: '08814519955', vehicle: 'Yamaha NMAX Abu-abu (E 3189 BC)', coverageAreas: ['Sumber', 'Weru', 'Plered', 'Tengah Tani', 'Gunung Jati', 'Plumbon', 'Mundu'] },
+  { id: 'c1', name: 'Kurir Soleman (Armada Cirebon Kota)', phone: '083152276387', vehicle: 'Honda Vario Hitam (E 4521 AA)', coverageAreas: ['Kesambi', 'Kedawung', 'Pekalipan', 'Kejaksan', 'Harjamukti', 'Lemahwungkuk'] },
+  { id: 'c2', name: 'Kurir Soleman (Armada Kabupaten Cirebon)', phone: '083152276387', vehicle: 'Yamaha NMAX Abu-abu (E 3189 BC)', coverageAreas: ['Sumber', 'Weru', 'Plered', 'Tengah Tani', 'Gunung Jati', 'Plumbon', 'Mundu'] },
 ];
 
 // Semua data contoh bawaan telah dihapus sepenuhnya. Aplikasi 100% menggunakan data real-time dari Firebase Firestore.
@@ -1294,4 +1457,5 @@ export const STATUS_LABELS: Record<Order['status'], { label: string; color: stri
   quality_check: { label: 'Pengecekan Kualitas (QC)', color: 'text-purple-400', badgeBg: 'bg-purple-500/10 text-purple-300 border-purple-500/20' },
   siap_antar: { label: 'Siap Diantar Kembali', color: 'text-emerald-400', badgeBg: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' },
   selesai: { label: 'Selesai & Diterima Pelanggan', color: 'text-emerald-500', badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
+  dibatalkan: { label: 'Dibatalkan (Stok Kosong)', color: 'text-rose-400', badgeBg: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
 };

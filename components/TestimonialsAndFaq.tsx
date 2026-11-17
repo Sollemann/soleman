@@ -149,7 +149,7 @@ export const TestimonialsAndFaq: React.FC = () => {
     },
     {
       q: 'Bagaimana saya mengetahui progres pengerjaan sepatu saya?',
-      a: 'Anda bisa mengecek status kapan saja di kolom "Lacak Status Sepatu" dengan memasukkan nomor kode seri pesanan Anda (misal: SLC-3891). Anda juga dapat mencetak / mengunduh Struk Tanda Terima Digital & Kartu Garansi 30 Hari langsung dari sistem.'
+      a: 'Tim Admin & Kurir Soleman akan mengirimkan update status pengerjaan langsung ke WhatsApp Anda di setiap tahap, atau Anda bisa cek riwayat pesanan langsung melalui menu Akun Pelanggan & WA Resmi 0831-5227-6387.'
     },
     {
       q: 'Berapa lama estimasi pengerjaan servis sepatu?',

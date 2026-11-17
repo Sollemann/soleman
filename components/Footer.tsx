@@ -66,15 +66,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onStaffAccess }) => 
                   onClick={() => onNavigate('antar-jemput')} 
                   className="hover:text-amber-400 transition-colors text-left"
                 >
-                  Antar-Jemput & Berbagi Lokasi Web
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => onNavigate('dashboard')} 
-                  className="hover:text-amber-400 transition-colors text-left"
-                >
-                  Lacak Status Sepatu & Progres
+                  Pesan Antar-Jemput & Share-Loc Kurir
                 </button>
               </li>
               <li>

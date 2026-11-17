@@ -26,6 +26,9 @@ import {
   Edit3,
   Trash2,
   Zap,
+  Crosshair,
+  Ban,
+  PackageX,
 } from 'lucide-react';
 import {
   Order,
@@ -35,12 +38,15 @@ import {
   DamageSeverity,
   ShoeType,
   ShoeItemDetail,
+  ServiceStockItem,
 } from '../types';
 import {
   STATUS_LABELS,
   SERVICES_CATALOG,
   CIREBON_AREAS,
   WORKSHOP_INFO,
+  SHOE_SIZES,
+  isTapakOrSoleSizeRequired,
   getServiceTierDetail,
   calculateDistanceToWorkshop,
 } from '../data/solcreftData';
@@ -48,6 +54,7 @@ import {
   buildGoogleMapsRouteUrl,
   buildStatusNotificationWhatsAppUrl,
   buildRequestRealWaSherlockUrl,
+  buildOutOfStockCancelWhatsAppUrl,
   parseShareLocInput,
   parseWhatsAppOrderTextToOrder,
 } from '../services/whatsappHelper';
@@ -56,6 +63,19 @@ import { soundFx } from '../services/soundEffects';
 interface CourierDashboardProps {
   courierUser: CourierUser;
   orders: Order[];
+  stockMap?: Record<string, ServiceStockItem>;
+  onToggleServiceStock?: (
+    serviceId: string,
+    isOutOfStock: boolean,
+    emptySizes?: string[],
+    note?: string
+  ) => void;
+  onCancelOrder?: (
+    orderId: string,
+    reason: string,
+    isOutOfStock: boolean,
+    cancelledBy: string
+  ) => void;
   onAcceptOrder?: (orderId: string, courierName?: string, courierPhone?: string) => void;
   onOrderCreated?: (order: Order) => void;
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus, customNote?: string) => void;
@@ -79,6 +99,9 @@ interface CourierDashboardProps {
 export const CourierDashboard: React.FC<CourierDashboardProps> = ({
   courierUser,
   orders,
+  stockMap = {},
+  onToggleServiceStock,
+  onCancelOrder,
   onAcceptOrder,
   onOrderCreated,
   onUpdateOrderStatus,
@@ -88,9 +111,14 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
   onDeleteOrder,
 }) => {
   const [filterTab, setFilterTab] = useState<
-    'need_pickup' | 'in_transit' | 'ready_deliver' | 'cod_pending' | 'completed' | 'all' | 'optimized_route'
+    'need_pickup' | 'in_transit' | 'ready_deliver' | 'cod_pending' | 'completed' | 'cancelled' | 'all' | 'optimized_route'
   >('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Origin Mode untuk Optimasi Rute Nearest-Neighbor (Workshop vs GPS Kurir Live)
+  const [routeStartMode, setRouteStartMode] = useState<'workshop' | 'gps'>('workshop');
+  const [courierOriginGps, setCourierOriginGps] = useState<{ lat: number; lng: number } | null>(null);
+  const [isDetectingCourierGps, setIsDetectingCourierGps] = useState(false);
 
   // Mapping koordinat pusat kecamatan se-Cirebon untuk estimasi jarak akurat
   const CIREBON_COORDINATES: Record<string, { lat: number; lng: number }> = {
@@ -111,48 +139,153 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
     'palimanan': { lat: -6.7060, lng: 108.4230 },
   };
 
-  const getOrderDistance = (order: Order): number => {
+  const calcHaversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Number((R * c).toFixed(1));
+  };
+
+  const getOrderCoords = (order: Order): { lat: number; lng: number; isEstimated: boolean } => {
     if (order.location.lat && order.location.lng) {
-      return calculateDistanceToWorkshop(order.location.lat, order.location.lng);
+      return { lat: order.location.lat, lng: order.location.lng, isEstimated: false };
+    }
+    const parsedFromUrl = order.location.mapsUrl ? parseShareLocInput(order.location.mapsUrl) : {};
+    if (parsedFromUrl.lat && parsedFromUrl.lng) {
+      return { lat: parsedFromUrl.lat, lng: parsedFromUrl.lng, isEstimated: false };
     }
     const cleanArea = (order.location.areaName || '').toLowerCase();
     for (const [key, coords] of Object.entries(CIREBON_COORDINATES)) {
       if (cleanArea.includes(key)) {
-        return calculateDistanceToWorkshop(coords.lat, coords.lng);
+        return { lat: coords.lat, lng: coords.lng, isEstimated: true };
       }
     }
-    return 3.0;
+    const areaObj = CIREBON_AREAS.find((a) =>
+      cleanArea.includes(a.name.split('(')[0].trim().toLowerCase())
+    );
+    if (areaObj) {
+      return { lat: areaObj.lat, lng: areaObj.lng, isEstimated: true };
+    }
+    return { lat: WORKSHOP_INFO.lat, lng: WORKSHOP_INFO.lng, isEstimated: true };
   };
 
-  // Titik rute berurutan dari yang terdekat dari workshop agar kurir tidak bolak-balik
-  const activeRouteStops = orders
-    .filter((o) => o.status !== 'selesai')
-    .map((o) => ({
-      order: o,
-      distanceKm: getOrderDistance(o),
-      isPickup: o.status === 'menunggu_jemput' || !o.isAcceptedByAdmin || o.status === 'perjalanan_workshop',
-    }))
-    .sort((a, b) => a.distanceKm - b.distanceKm);
+  // Algoritma Rute Terdekat Berantai (Nearest-Neighbor TSP) agar kurir tidak bolak-balik
+  const routeOriginCoords =
+    routeStartMode === 'gps' && courierOriginGps
+      ? courierOriginGps
+      : { lat: WORKSHOP_INFO.lat, lng: WORKSHOP_INFO.lng };
+
+  const activeRouteStops = (() => {
+    const candidates = orders
+      .filter((o) => o.status !== 'selesai' && o.status !== 'dibatalkan')
+      .map((o) => ({
+        order: o,
+        coords: getOrderCoords(o),
+        workshopDistanceKm: calculateDistanceToWorkshop(getOrderCoords(o).lat, getOrderCoords(o).lng),
+        isPickup: o.status === 'menunggu_jemput' || !o.isAcceptedByAdmin || o.status === 'perjalanan_workshop',
+      }));
+
+    const orderedStops: {
+      order: Order;
+      coords: { lat: number; lng: number; isEstimated: boolean };
+      workshopDistanceKm: number;
+      legDistanceKm: number;
+      cumulativeDistanceKm: number;
+      fromLabel: string;
+      prevCoords: { lat: number; lng: number };
+      isPickup: boolean;
+    }[] = [];
+
+    const remaining = [...candidates];
+    let cursor = { lat: routeOriginCoords.lat, lng: routeOriginCoords.lng };
+    let cursorLabel = routeStartMode === 'gps' && courierOriginGps ? 'Posisi GPS Kurir' : 'Workshop Sukalila';
+    let cumulative = 0;
+
+    while (remaining.length > 0) {
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        const d = calcHaversineKm(cursor.lat, cursor.lng, remaining[i].coords.lat, remaining[i].coords.lng);
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = i;
+        }
+      }
+      const chosen = remaining.splice(bestIdx, 1)[0];
+      cumulative = Number((cumulative + bestDist).toFixed(1));
+      orderedStops.push({
+        order: chosen.order,
+        coords: chosen.coords,
+        workshopDistanceKm: chosen.workshopDistanceKm,
+        legDistanceKm: bestDist,
+        cumulativeDistanceKm: cumulative,
+        fromLabel: cursorLabel,
+        prevCoords: { ...cursor },
+        isPickup: chosen.isPickup,
+      });
+      cursor = { lat: chosen.coords.lat, lng: chosen.coords.lng };
+      cursorLabel = chosen.order.customerName;
+    }
+
+    return orderedStops;
+  })();
+
+  const totalRouteKm =
+    activeRouteStops.length > 0
+      ? activeRouteStops[activeRouteStops.length - 1].cumulativeDistanceKm
+      : 0;
+
+  const handleDetectCourierGps = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      showToast('Browser tidak mendukung GPS langsung.');
+      return;
+    }
+    setIsDetectingCourierGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCourierOriginGps({
+          lat: Number(pos.coords.latitude.toFixed(6)),
+          lng: Number(pos.coords.longitude.toFixed(6)),
+        });
+        setRouteStartMode('gps');
+        setIsDetectingCourierGps(false);
+        soundFx.playSuccess();
+        showToast('🛰️ Posisi GPS Kurir aktif! Rute diurutkan ulang dari lokasi Anda saat ini.');
+      },
+      () => {
+        setIsDetectingCourierGps(false);
+        showToast('Gagal membaca GPS kurir. Pastikan izin lokasi browser aktif.');
+      },
+      { enableHighAccuracy: true, timeout: 9000 }
+    );
+  };
 
   const buildMultiStopRouteUrl = () => {
     if (activeRouteStops.length === 0) return '';
-    const origin = `${WORKSHOP_INFO.lat},${WORKSHOP_INFO.lng}`;
+    const origin = `${routeOriginCoords.lat},${routeOriginCoords.lng}`;
+    const formatStopParam = (stop: (typeof activeRouteStops)[0]) => {
+      if (!stop.coords.isEstimated) {
+        return `${stop.coords.lat},${stop.coords.lng}`;
+      }
+      return encodeURIComponent(
+        `${stop.order.location.landmark ? stop.order.location.landmark + ', ' : ''}${stop.order.location.areaName}, Cirebon`
+      );
+    };
     const lastStop = activeRouteStops[activeRouteStops.length - 1];
-    const destination = lastStop.order.location.lat && lastStop.order.location.lng
-      ? `${lastStop.order.location.lat},${lastStop.order.location.lng}`
-      : encodeURIComponent(`${lastStop.order.location.areaName}, Cirebon`);
+    const destination = formatStopParam(lastStop);
 
     if (activeRouteStops.length === 1) {
       return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
     }
 
-    const waypoints = activeRouteStops.slice(0, -1).map((s) => {
-      if (s.order.location.lat && s.order.location.lng) {
-        return `${s.order.location.lat},${s.order.location.lng}`;
-      }
-      return encodeURIComponent(`${s.order.location.areaName}, Cirebon`);
-    }).join('|');
-
+    const waypoints = activeRouteStops.slice(0, -1).map(formatStopParam).join('|');
     return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
   };
 
@@ -167,6 +300,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
   const [qCustomerPhone, setQCustomerPhone] = useState('');
   const [qShoeBrand, setQShoeBrand] = useState('');
   const [qShoeType, setQShoeType] = useState<ShoeType>('Sneakers');
+  const [qShoeSize, setQShoeSize] = useState<string>('40');
   const [qSeverity, setQSeverity] = useState<DamageSeverity>('normal');
   const [qServiceId, setQServiceId] = useState<string>(SERVICES_CATALOG[0].id);
   const [qPairsCount, setQPairsCount] = useState<number>(1);
@@ -185,6 +319,13 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
   const [editPaymentMethod, setEditPaymentMethod] = useState<'cod' | 'qris'>('cod');
   const [editDeliveryFee, setEditDeliveryFee] = useState<number>(0);
   const [editShoes, setEditShoes] = useState<ShoeItemDetail[]>([]);
+
+  // Kelola Stok Kosong (Tapak / Bahan) & Batal Order
+  const [showStockManager, setShowStockManager] = useState(false);
+  const [stockEditServiceId, setStockEditServiceId] = useState<string>('ganti-tapak-sekolah');
+  const [stockEditNote, setStockEditNote] = useState<string>('');
+  const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState('Stok Tapak / Bahan Sepatu Sedang Kosong');
 
   // Quick WA Sherlock & Patokan Sync State per Order Card
   const [syncingOrderId, setSyncingOrderId] = useState<string | null>(null);
@@ -215,9 +356,10 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
     (o) => o.status === 'siap_antar' || o.status === 'quality_check'
   ).length;
   const countCodPending = orders.filter(
-    (o) => o.paymentMethod === 'cod' && o.paymentStatus !== 'cod_selesai'
+    (o) => o.status !== 'dibatalkan' && o.paymentMethod === 'cod' && o.paymentStatus !== 'cod_selesai'
   ).length;
   const countCompleted = orders.filter((o) => o.status === 'selesai').length;
+  const countCancelled = orders.filter((o) => o.status === 'dibatalkan').length;
 
   // Proses Kilat 1-Klik dari Teks WA / Link Sherlock
   const processInstantWaText = (text: string) => {
@@ -241,7 +383,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
         acceptedAt: timeStr + ' WIB',
         status: 'perjalanan_workshop',
         assignedCourier: courierUser.name,
-        assignedCourierPhone: '08814519955',
+        assignedCourierPhone: '083152276387',
         timeline: [
           {
             status: 'perjalanan_workshop',
@@ -310,6 +452,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
       setQCustomerPhone(o.customerPhone);
       setQShoeBrand(o.shoeBrand);
       setQShoeType(o.shoeType);
+      if (o.shoeSize) setQShoeSize(o.shoeSize);
       setQSeverity(o.severity || 'normal');
       if (o.selectedServices[0]) setQServiceId(o.selectedServices[0].id);
       setQPairsCount(o.pairsCount);
@@ -363,7 +506,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
         isAcceptedByAdmin: true,
         acceptedAt: timeStr + ' WIB',
         assignedCourier: courierUser.name,
-        assignedCourierPhone: '08814519955',
+        assignedCourierPhone: '083152276387',
         location: {
           ...extractedFullOrder.location,
           areaName: cleanArea,
@@ -394,13 +537,15 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
     );
     const autoDeliveryFee = isKota || qPairsCount >= 2 ? 0 : 10000;
     const finalTotal = qCustomPrice > 0 ? qCustomPrice : serviceTotal + autoDeliveryFee;
+    const needsSize = isTapakOrSoleSizeRequired([chosenService]);
 
     const newOrder: Order = {
       id: cleanOrderId,
       customerName: qCustomerName.trim() || 'Pelanggan WA Soleman',
-      customerPhone: qCustomerPhone.trim() || '08814519955',
+      customerPhone: qCustomerPhone.trim() || '083152276387',
       shoeBrand: qShoeBrand.trim() || 'Sepatu Pelanggan',
       shoeType: qShoeType,
+      shoeSize: needsSize ? qShoeSize : undefined,
       material: 'Canvas / Kain',
       severity: qSeverity,
       pairsCount: Math.max(1, qPairsCount),
@@ -413,6 +558,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
             ? `${qShoeBrand.trim() || 'Sepatu'} #${idx + 1}`
             : qShoeBrand.trim() || 'Sepatu Pelanggan',
         shoeType: qShoeType,
+        shoeSize: needsSize ? qShoeSize : undefined,
         material: 'Canvas / Kain',
         severity: qSeverity,
         selectedServices: [chosenService],
@@ -442,7 +588,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
       isAcceptedByAdmin: true,
       acceptedAt: timeStr + ' WIB',
       assignedCourier: courierUser.name,
-      assignedCourierPhone: '08814519955',
+      assignedCourierPhone: '083152276387',
       createdAt: new Date().toLocaleString('id-ID', {
         dateStyle: 'medium',
         timeStyle: 'short',
@@ -556,6 +702,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
       {
         shoeBrand: summaryBrand,
         shoeType: recalculatedShoes[0]?.shoeType || editingOrder.shoeType,
+        shoeSize: recalculatedShoes[0]?.shoeSize || editingOrder.shoeSize,
         severity: recalculatedShoes[0]?.severity || editingOrder.severity,
         pairsCount: recalculatedShoes.length,
         selectedServices: allServices,
@@ -586,7 +733,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
   const handleQuickAcceptCard = (order: Order, openWaConfirmation: boolean) => {
     soundFx.playSuccess();
     if (onAcceptOrder) {
-      onAcceptOrder(order.id, courierUser.name, '08814519955');
+      onAcceptOrder(order.id, courierUser.name, '083152276387');
     } else {
       onUpdateOrderStatus(
         order.id,
@@ -609,7 +756,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
     .filter((order) => {
       let matchTab = true;
       if (filterTab === 'need_pickup')
-        matchTab = order.status === 'menunggu_jemput' || !order.isAcceptedByAdmin;
+        matchTab = (order.status === 'menunggu_jemput' || !order.isAcceptedByAdmin) && order.status !== 'dibatalkan';
       else if (filterTab === 'in_transit')
         matchTab =
           !!order.isAcceptedByAdmin &&
@@ -618,8 +765,9 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
         matchTab = order.status === 'siap_antar' || order.status === 'quality_check';
       else if (filterTab === 'cod_pending')
         matchTab =
-          order.paymentMethod === 'cod' && order.paymentStatus !== 'cod_selesai';
+          order.status !== 'dibatalkan' && order.paymentMethod === 'cod' && order.paymentStatus !== 'cod_selesai';
       else if (filterTab === 'completed') matchTab = order.status === 'selesai';
+      else if (filterTab === 'cancelled') matchTab = order.status === 'dibatalkan';
 
       const q = searchQuery.toLowerCase();
       const matchSearch =
@@ -688,18 +836,36 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                 <span>Armada Jemput-Antar Aktif Cirebon</span>
               </span>
               <span className="text-xs text-slate-400 font-mono">
-                WA Kurir: 0881-4519-955
+                WA Kurir: 0831-5227-6387
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-white font-display">
               Portal Pesanan & Navigasi {courierUser.name}
             </h1>
             <p className="text-xs text-slate-400">
-              Terima pesanan pelanggan dalam 1 klik, kunci lokasi Sherlock Asli WA & patokan rumah, serta sesuaikan kerusakan fisik di lapangan.
+              Terima pesanan pelanggan dalam 1 klik, ikuti jalur terdekat agar tidak bolak-balik, serta atur stok tapak kosong.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {onToggleServiceStock && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setShowStockManager(prev => !prev);
+                }}
+                className={`flex items-center gap-2 px-3.5 py-3 rounded-2xl text-xs font-black border transition-all cursor-pointer ${
+                  showStockManager
+                    ? 'bg-rose-500 text-white border-rose-400 shadow-lg shadow-rose-500/20'
+                    : 'bg-slate-800 hover:bg-slate-700 text-rose-300 border-rose-500/40'
+                }`}
+              >
+                <PackageX className="w-4 h-4" />
+                <span>Stok Kosong ({(Object.values(stockMap) as ServiceStockItem[]).filter(s => s.isOutOfStock || (s.emptySizes && s.emptySizes.length > 0)).length})</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={async () => {
@@ -905,6 +1071,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
             },
             { id: 'cod_pending', label: `💵 Tagihan COD (${countCodPending})` },
             { id: 'completed', label: `✅ Selesai (${countCompleted})` },
+            { id: 'cancelled', label: `❌ Dibatalkan (${countCancelled})` },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -935,34 +1102,182 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
         </div>
       </div>
 
-      {/* 3. DAFTAR PESANAN ATAU RUTE BERDASARKAN JARAK */}
-      {filterTab === 'optimized_route' ? (
-        <div className="space-y-4">
-          <div className="p-5 sm:p-6 rounded-3xl bg-slate-900 border border-cyan-400/40 shadow-[0_0_25px_rgba(0,240,255,0.2)] flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2">
-                <Navigation className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Rute Antar-Jemput Cerdas Berurutan</span>
+      {/* PANEL KELOLA STOK KOSONG REAL-TIME (TAPAK & UKURAN) */}
+      {showStockManager && onToggleServiceStock && (() => {
+        const selectedSrv = SERVICES_CATALOG.find(s => s.id === stockEditServiceId) || SERVICES_CATALOG[0];
+        const currentStock = stockMap[selectedSrv.id];
+        const isOut = Boolean(currentStock?.isOutOfStock);
+        const emptySizes = currentStock?.emptySizes || [];
+        return (
+          <div className="p-5 rounded-3xl bg-slate-900 border border-rose-500/40 shadow-xl space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                  <PackageX className="w-4 h-4" /> Manajemen Stok Kosong (Tapak, Ukuran & Bahan)
+                </span>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Tandai menu atau ukuran sepatu yang stoknya kosong agar tampil di halaman pelanggan dan bisa membatalkan pesanan terkait.
+                </p>
               </div>
-              <h3 className="text-xl font-black text-white">
-                Urutan Jarak Terdekat Tanpa Bolak-Balik
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Tiap titik lokasi disesuaikan dengan nama pelanggan dan diurutkan dari Workshop Sukalila Cirebon.
-              </p>
+              <button
+                type="button"
+                onClick={() => setShowStockManager(false)}
+                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {activeRouteStops.length > 0 && (
-              <a
-                href={buildMultiStopRouteUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="py-3 px-5 rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-400/30 transition-all shrink-0 cursor-pointer"
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+              <div className="md:col-span-5 space-y-2">
+                <label className="text-xs font-bold text-slate-300 block">Pilih Menu Layanan / Model Tapak:</label>
+                <select
+                  value={stockEditServiceId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setStockEditServiceId(nextId);
+                    setStockEditNote(stockMap[nextId]?.note || '');
+                  }}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-rose-400"
+                >
+                  {SERVICES_CATALOG.map(s => {
+                    const st = stockMap[s.id];
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {st?.isOutOfStock ? '❌ [KOSONG] ' : st?.emptySizes?.length ? `⚠️ [${st.emptySizes.length} Size Kosong] ` : '✅ '}
+                        {s.name}
+                      </option>
+                    );
+                  })}
+                </select>
+                <input
+                  type="text"
+                  value={stockEditNote}
+                  onChange={(e) => setStockEditNote(e.target.value)}
+                  placeholder="Catatan stok (misal: Stok outsole putih sedang kosong)"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-rose-400"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onToggleServiceStock(selectedSrv.id, !isOut, emptySizes, stockEditNote || (!isOut ? 'Stok tapak / bahan sedang kosong' : ''));
+                      showToast(!isOut ? `❌ ${selectedSrv.name} ditandai STOK KOSONG!` : `✅ ${selectedSrv.name} kembali TERSEDIA.`);
+                    }}
+                    className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                      isOut
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                        : 'bg-rose-600 hover:bg-rose-500 text-white'
+                    }`}
+                  >
+                    {isOut ? '✅ Aktifkan Kembali (Stok Ada)' : '❌ Tandai Menu Ini STOK KOSONG'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="md:col-span-7 space-y-2">
+                <label className="text-xs font-bold text-slate-300 block">
+                  Atau Tandai Ukuran Sepatu / Sandal Tertentu yang Kosong (EU):
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {SHOE_SIZES.map(sz => {
+                    const isSizeEmpty = emptySizes.includes(sz);
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => {
+                          const nextSizes = isSizeEmpty
+                            ? emptySizes.filter(x => x !== sz)
+                            : [...emptySizes, sz];
+                          onToggleServiceStock(selectedSrv.id, isOut, nextSizes, stockEditNote);
+                          showToast(`Ukuran EU ${sz} untuk ${selectedSrv.name} ${isSizeEmpty ? 'tersedia kembali' : 'ditandai KOSONG'}.`);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          isSizeEmpty
+                            ? 'bg-rose-600 text-white border-rose-400 shadow-sm'
+                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-rose-500/40'
+                        }`}
+                      >
+                        {isSizeEmpty ? `✕ ${sz}` : sz}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Klik nomor ukuran untuk menandai ukuran tersebut habis. Perubahan tersinkron otomatis ke website pelanggan.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 3. DAFTAR PESANAN ATAU RUTE BERDASARKAN JARAK TERDEKAT BERANTAI */}
+      {filterTab === 'optimized_route' ? (
+        <div className="space-y-4">
+          <div className="p-5 sm:p-6 rounded-3xl bg-slate-900 border border-cyan-400/40 shadow-[0_0_25px_rgba(0,240,255,0.2)] space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2">
+                  <Navigation className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Jalur Urutan Antar-Jemput Nearest-Neighbor (Anti Bolak-Balik)</span>
+                </div>
+                <h3 className="text-xl font-black text-white">
+                  Urutan Rute Terdekat Berantai ({activeRouteStops.length} Titik • Total ±{totalRouteKm} KM)
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Setiap titik berikutnya dipilih dari yang paling dekat dengan lokasi sebelumnya — bukan bolak-balik dari workshop!
+                </p>
+              </div>
+
+              {activeRouteStops.length > 0 && (
+                <a
+                  href={buildMultiStopRouteUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-3 px-5 rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-500 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-400/30 transition-all shrink-0 cursor-pointer"
+                >
+                  <Navigation className="w-4 h-4 fill-slate-950" />
+                  <span>🚀 Buka Semua Rute Sekaligus di Google Maps ({activeRouteStops.length} Titik)</span>
+                </a>
+              )}
+            </div>
+
+            {/* Toggle Titik Awal Rute: Workshop vs GPS Kurir Live */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800 text-xs">
+              <span className="text-slate-400 font-bold">Mulai Jalur Dari:</span>
+              <button
+                type="button"
+                onClick={() => setRouteStartMode('workshop')}
+                className={`px-3 py-1.5 rounded-xl font-bold border transition-all cursor-pointer ${
+                  routeStartMode === 'workshop'
+                    ? 'bg-cyan-400 text-slate-950 border-cyan-300'
+                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                }`}
               >
-                <Navigation className="w-4 h-4 fill-slate-950" />
-                <span>🚀 Buka Semua Rute Sekaligus di Google Maps ({activeRouteStops.length} Titik)</span>
-              </a>
-            )}
+                🏢 Workshop Sukalila
+              </button>
+              <button
+                type="button"
+                onClick={handleDetectCourierGps}
+                disabled={isDetectingCourierGps}
+                className={`px-3 py-1.5 rounded-xl font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                  routeStartMode === 'gps' && courierOriginGps
+                    ? 'bg-emerald-400 text-slate-950 border-emerald-300'
+                    : 'bg-slate-950 text-cyan-300 border-cyan-500/40 hover:bg-cyan-950/50'
+                }`}
+              >
+                <Crosshair className="w-3.5 h-3.5" />
+                <span>
+                  {isDetectingCourierGps
+                    ? 'Membaca GPS Kurir...'
+                    : routeStartMode === 'gps' && courierOriginGps
+                    ? `🛰️ Posisi GPS Kurir Aktif (${courierOriginGps.lat.toFixed(4)}, ${courierOriginGps.lng.toFixed(4)})`
+                    : '🛰️ Gunakan Posisi GPS Kurir Saat Ini'}
+                </span>
+              </button>
+            </div>
           </div>
 
           {activeRouteStops.length === 0 ? (
@@ -974,9 +1289,9 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
             <div className="space-y-3">
               {activeRouteStops.map((stop, idx) => {
                 const o = stop.order;
-                const singleNavUrl = o.location.lat && o.location.lng
-                  ? `https://www.google.com/maps/dir/?api=1&origin=${WORKSHOP_INFO.lat},${WORKSHOP_INFO.lng}&destination=${o.location.lat},${o.location.lng}`
-                  : `https://www.google.com/maps/dir/?api=1&origin=${WORKSHOP_INFO.lat},${WORKSHOP_INFO.lng}&destination=${encodeURIComponent(o.location.areaName + ', Cirebon')}`;
+                const legNavUrl = !stop.coords.isEstimated
+                  ? `https://www.google.com/maps/dir/?api=1&origin=${stop.prevCoords.lat},${stop.prevCoords.lng}&destination=${stop.coords.lat},${stop.coords.lng}&travelmode=driving`
+                  : `https://www.google.com/maps/dir/?api=1&origin=${stop.prevCoords.lat},${stop.prevCoords.lng}&destination=${encodeURIComponent((o.location.landmark ? o.location.landmark + ', ' : '') + o.location.areaName + ', Cirebon')}&travelmode=driving`;
 
                 return (
                   <div
@@ -991,7 +1306,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-black uppercase text-cyan-300 bg-cyan-950/80 border border-cyan-400/40 px-2.5 py-0.5 rounded-md">
-                            Titik Lokasi: {o.customerName}
+                            {o.customerName}
                           </span>
                           <span className="text-xs text-slate-400 font-mono font-bold">
                             #{o.id}
@@ -999,31 +1314,47 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                           <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                             {stop.isPickup ? `📥 Jemput (${o.pairsCount} pasang)` : '📦 Antar Selesai'}
                           </span>
+                          {!stop.coords.isEstimated ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+                              ✅ Pin GPS Akurat
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                              📍 Estimasi Kecamatan
+                            </span>
+                          )}
                         </div>
 
-                        <div className="text-sm font-bold text-white flex items-center gap-2">
+                        <div className="text-sm font-bold text-white flex items-center gap-2 flex-wrap">
                           <MapPin className="w-4 h-4 text-cyan-400 shrink-0" />
-                          <span>Kecamatan {o.location.areaName}</span>
-                          <span className="text-xs font-mono text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded-md border border-cyan-500/30 font-bold">
-                            ±{stop.distanceKm} KM dari Sukalila
+                          <span>{o.location.areaName}</span>
+                          <span className="text-xs font-mono text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-500/30 font-bold">
+                            +{stop.legDistanceKm} KM dari {stop.fromLabel}
+                          </span>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            (Total: {stop.cumulativeDistanceKm} KM)
                           </span>
                         </div>
 
+                        <p className="text-xs text-slate-300">
+                          Patokan: <strong className="text-amber-300">{o.location.landmark || o.location.fullAddress}</strong>
+                        </p>
+
                         <p className="text-xs text-slate-400">
-                          {o.shoeBrand} • Tagihan: <strong className="text-white">Rp {o.totalAmount.toLocaleString('id-ID')}</strong> ({o.paymentMethod.toUpperCase()})
+                          {o.shoeBrand}{o.shoeSize ? ` (EU ${o.shoeSize})` : ''} • Tagihan: <strong className="text-white">Rp {o.totalAmount.toLocaleString('id-ID')}</strong> ({o.paymentMethod.toUpperCase()})
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
                       <a
-                        href={singleNavUrl}
+                        href={legNavUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3.5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs font-black flex items-center gap-1.5 shadow-md shadow-cyan-400/30 transition-all cursor-pointer"
                       >
                         <Navigation className="w-3.5 h-3.5 fill-slate-950" />
-                        <span>Navigasi Maps</span>
+                        <span>Navigasi Titik #{idx + 1}</span>
                       </a>
 
                       <a
@@ -1056,9 +1387,9 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
       ) : (
         <div className="space-y-4">
           {filteredOrders.map((order) => {
-          const statusConfig = STATUS_LABELS[order.status];
+          const statusConfig = STATUS_LABELS[order.status] || { label: order.status, color: 'text-slate-300', badgeBg: 'bg-slate-800 text-slate-300 border-slate-700' };
           const isNewUnaccepted =
-            !order.isAcceptedByAdmin || order.status === 'menunggu_jemput';
+            (!order.isAcceptedByAdmin || order.status === 'menunggu_jemput') && order.status !== 'dibatalkan';
           const hasExactSherlock = Boolean(
             (order.location.lat && order.location.lng) || order.location.mapsUrl
           );
@@ -1077,7 +1408,9 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
             <div
               key={order.id}
               className={`rounded-3xl border transition-all overflow-hidden shadow-xl ${
-                isNewUnaccepted
+                order.status === 'dibatalkan'
+                  ? 'bg-slate-900/75 border-rose-500/40 opacity-90'
+                  : isNewUnaccepted
                   ? 'bg-slate-900 border-amber-500/60 ring-1 ring-amber-500/30'
                   : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
               }`}
@@ -1467,11 +1800,17 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                                   {sevBadge.label}
                                 </span>
                               </div>
-                              <div className="text-[10px] text-slate-400">
-                                {sh.shoeType} •{' '}
+                              <div className="text-[10px] text-slate-400 flex flex-wrap items-center gap-1.5">
+                                <span>{sh.shoeType}</span>
+                                <span>•</span>
                                 <span className="text-amber-300">
                                   {sh.material}
                                 </span>
+                                {(sh.shoeSize || order.shoeSize) && (
+                                  <span className="px-1.5 py-0.2 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-mono font-bold">
+                                    Ukuran: EU {sh.shoeSize || order.shoeSize}
+                                  </span>
+                                )}
                               </div>
                               <div className="space-y-0.5 pt-1 border-t border-slate-800/80">
                                 {sh.selectedServices.map((s) => {
@@ -1500,8 +1839,13 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                       </div>
                     ) : (
                       <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5">
-                        <div className="text-xs font-bold text-white">
-                          {order.shoeBrand}
+                        <div className="text-xs font-bold text-white flex items-center justify-between gap-2">
+                          <span>{order.shoeBrand}</span>
+                          {order.shoeSize && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-mono font-bold">
+                              EU {order.shoeSize}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-slate-400">
                           {order.shoeType}
@@ -1713,8 +2057,32 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                       </div>
                     )}
 
+                    {/* TAHAP BATAL (STOK KOSONG) */}
+                    {order.status === 'dibatalkan' && (
+                      <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-center space-y-2">
+                        <div className="flex items-center justify-center gap-1.5 text-rose-300 text-xs font-extrabold">
+                          <Ban className="w-4 h-4" />
+                          <span>Dibatalkan (Stok Kosong)</span>
+                        </div>
+                        {order.cancellationReason && (
+                          <p className="text-[10px] text-rose-200 leading-snug">
+                            Alasan: {order.cancellationReason}
+                          </p>
+                        )}
+                        <a
+                          href={buildOutOfStockCancelWhatsAppUrl(order)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-2 px-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center gap-1"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Kirim Info Stok Kosong ke WA</span>
+                        </a>
+                      </div>
+                    )}
+
                     {/* Status Pembayaran COD Quick Toggle */}
-                    {order.paymentMethod === 'cod' && (
+                    {order.paymentMethod === 'cod' && order.status !== 'dibatalkan' && (
                       <div className="pt-1">
                         {order.paymentStatus === 'cod_selesai' ? (
                           <div className="flex items-center justify-center gap-1.5 text-emerald-400 text-[11px] font-bold bg-emerald-500/10 py-2 px-2.5 rounded-xl border border-emerald-500/20">
@@ -1741,7 +2109,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                     )}
                   </div>
 
-                  {/* Kontrol Ubah Status Manual & Kirim WA */}
+                  {/* Kontrol Ubah Status Manual, Stok Kosong/Batalkan & Kirim WA */}
                   <div className="pt-2.5 border-t border-slate-800 space-y-2">
                     <div className="flex items-center gap-1.5">
                       <select
@@ -1765,6 +2133,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                         <option value="quality_check">4. Lolos QC</option>
                         <option value="siap_antar">5. Siap Diantar</option>
                         <option value="selesai">6. Selesai</option>
+                        <option value="dibatalkan">❌ Dibatalkan (Stok Kosong)</option>
                       </select>
 
                       {onDeleteOrder && (
@@ -1782,6 +2151,24 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                       )}
                     </div>
 
+                    {onCancelOrder && order.status !== 'dibatalkan' && order.status !== 'selesai' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCancellingOrder(order);
+                          setCancelReason(
+                            order.shoeSize
+                              ? `Stok Tapak / Ukuran EU ${order.shoeSize} Sedang Kosong`
+                              : 'Stok Tapak / Bahan Sepatu Sedang Kosong'
+                          );
+                        }}
+                        className="w-full py-1.5 px-3 rounded-xl text-[11px] font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/35 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        <Ban className="w-3 h-3" />
+                        <span>Stok Kosong / Batalkan Order</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() =>
@@ -1791,6 +2178,8 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                             ? 'perjalanan_workshop'
                             : order.status === 'siap_antar'
                             ? 'selesai'
+                            : order.status === 'dibatalkan'
+                            ? 'dibatalkan'
                             : 'siap_antar'
                         )
                       }
@@ -1939,7 +2328,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-slate-300 font-bold mb-1">
                     Merk / Model Sepatu *
@@ -1983,6 +2372,22 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                     <option value="kecil">🟢 Ringan (Sebagian)</option>
                     <option value="normal">🟡 Sedang (Standar)</option>
                     <option value="hard">🔴 Berat / Parah</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-cyan-300 font-bold mb-1">
+                    Ukuran (Tapak/Tambal)
+                  </label>
+                  <select
+                    value={qShoeSize}
+                    onChange={(e) => setQShoeSize(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-cyan-300 font-bold focus:outline-none focus:border-cyan-400"
+                  >
+                    {SHOE_SIZES.map((sz) => (
+                      <option key={sz} value={sz}>
+                        EU {sz}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -2156,7 +2561,7 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                         <div>
                           <label className="block text-slate-400 font-bold mb-1">
                             Merk / Model
@@ -2227,6 +2632,26 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                             <option value="normal">🟡 Sedang (Standar)</option>
                             <option value="hard">🔴 Berat / Parah</option>
                           </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-cyan-300 font-bold mb-1">
+                            Ukuran (EU)
+                          </label>
+                          <input
+                            type="text"
+                            value={shoe.shoeSize || ''}
+                            placeholder="40"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditShoes((prev) =>
+                                prev.map((item, i) =>
+                                  i === sIdx ? { ...item, shoeSize: val } : item
+                                )
+                              );
+                            }}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-cyan-300 font-mono"
+                          />
                         </div>
                       </div>
 
@@ -2371,6 +2796,9 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
                 <option value="selesai">
                   ✅ Sepatu Telah Diterima (Garansi Aktif)
                 </option>
+                <option value="dibatalkan">
+                  ❌ Pesanan Dibatalkan (Stok Kosong)
+                </option>
               </select>
             </div>
 
@@ -2403,6 +2831,92 @@ export const CourierDashboard: React.FC<CourierDashboardProps> = ({
               >
                 <Send className="w-4 h-4" />
                 <span>Kirim WhatsApp</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: BATALKAN PESANAN KARENA STOK KOSONG */}
+      {cancellingOrder && onCancelOrder && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-slate-900 border border-rose-500/40 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-3">
+              <div>
+                <span className="text-[11px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Ban className="w-3.5 h-3.5" /> Batalkan Order (Stok Kosong)
+                </span>
+                <h3 className="text-base font-extrabold text-white mt-0.5">
+                  #{cancellingOrder.id} — {cancellingOrder.customerName}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {cancellingOrder.shoeBrand}{cancellingOrder.shoeSize ? ` • Ukuran EU ${cancellingOrder.shoeSize}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCancellingOrder(null)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <label className="block font-bold text-slate-300">Pilih Alasan Cepat Stok Kosong:</label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Stok Tapak / Outsole Kosong',
+                  `Ukuran Tapak EU ${cancellingOrder.shoeSize || '40'} Kosong`,
+                  'Bahan Sol Belum Tersedia di Workshop',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setCancelReason(preset)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border cursor-pointer ${
+                      cancelReason === preset
+                        ? 'bg-rose-500 text-white border-rose-400'
+                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-rose-500/40'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                rows={2}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-rose-400"
+              />
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onCancelOrder(cancellingOrder.id, cancelReason.trim() || 'Stok Kosong', true, courierUser.name);
+                  const waUrl = buildOutOfStockCancelWhatsAppUrl(cancellingOrder, cancelReason);
+                  window.open(waUrl, '_blank');
+                  showToast(`Order #${cancellingOrder.id} dibatalkan (Stok Kosong) & notif WA dibuka.`);
+                  setCancellingOrder(null);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Batalkan & Kirim Info Stok Kosong ke WA</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onCancelOrder(cancellingOrder.id, cancelReason.trim() || 'Stok Kosong', true, courierUser.name);
+                  showToast(`Order #${cancellingOrder.id} dibatalkan karena stok kosong.`);
+                  setCancellingOrder(null);
+                }}
+                className="w-full py-2 px-4 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
+              >
+                Batalkan Saja (Tanpa Buka WA)
               </button>
             </div>
           </div>

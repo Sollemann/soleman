@@ -28,14 +28,17 @@ import {
   X,
   Sparkles,
   Share2,
-  Calendar
+  Calendar,
+  Ban,
+  PackageX
 } from 'lucide-react';
-import { Order, OrderStatus, AdminUser, ServiceItem, ShoeType } from '../types';
-import { STATUS_LABELS, COURIER_DRIVERS, SERVICES_CATALOG, CIREBON_AREAS, WORKSHOP_INFO, getServiceTierDetail } from '../data/solcreftData';
+import { Order, OrderStatus, AdminUser, ServiceItem, ShoeType, ServiceStockItem } from '../types';
+import { STATUS_LABELS, COURIER_DRIVERS, SERVICES_CATALOG, CIREBON_AREAS, WORKSHOP_INFO, SHOE_SIZES, isTapakOrSoleSizeRequired, getServiceTierDetail } from '../data/solcreftData';
 import { 
   buildOrderAcceptedWhatsAppUrl, 
   buildNotifyCourierWhatsAppUrl, 
   buildStatusNotificationWhatsAppUrl, 
+  buildOutOfStockCancelWhatsAppUrl,
   buildGoogleMapsRouteUrl 
 } from '../services/whatsappHelper';
 import { SolemanLogo } from './SolemanLogo';
@@ -43,6 +46,9 @@ import { SolemanLogo } from './SolemanLogo';
 interface AdminDashboardProps {
   adminUser: AdminUser;
   orders: Order[];
+  stockMap?: Record<string, ServiceStockItem>;
+  onToggleServiceStock?: (serviceId: string, isOutOfStock: boolean, emptySizes?: string[], note?: string) => void;
+  onCancelOrder?: (orderId: string, reason: string, isOutOfStock: boolean, cancelledBy: string) => void;
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus, customNote?: string) => void;
   onAcceptOrder: (orderId: string, courierName: string, courierPhone: string) => void;
   onRejectOrder: (orderId: string, reason: string) => void;
@@ -54,6 +60,9 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   adminUser,
   orders,
+  stockMap = {},
+  onToggleServiceStock,
+  onCancelOrder,
   onUpdateOrderStatus,
   onAcceptOrder,
   onRejectOrder,
@@ -61,7 +70,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onOpenCreateOrder,
   onOrderCreated
 }) => {
-  const [filterTab, setFilterTab] = useState<'pending' | 'in_progress' | 'ready' | 'completed' | 'all'>('pending');
+  const [filterTab, setFilterTab] = useState<'pending' | 'in_progress' | 'ready' | 'completed' | 'cancelled' | 'all'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   
   // Privacy toggle per order (by default all addresses are kept private in dashboard, routed via WhatsApp)
@@ -76,11 +85,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [dailyRecapModalOpen, setDailyRecapModalOpen] = useState(false);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
+  // Stock Management & Order Cancellation State
+  const [showStockManager, setShowStockManager] = useState(false);
+  const [stockEditServiceId, setStockEditServiceId] = useState<string>(SERVICES_CATALOG.find(s => s.category === 'sol')?.id || SERVICES_CATALOG[0].id);
+  const [stockEditNote, setStockEditNote] = useState('');
+  const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState('Stok Tapak / Bahan Sepatu Sedang Kosong');
+
   // Quick Order State
   const [qCustomerName, setQCustomerName] = useState('');
   const [qCustomerPhone, setQCustomerPhone] = useState('');
   const [qShoeBrand, setQShoeBrand] = useState('');
   const [qShoeType, setQShoeType] = useState<ShoeType>('Sneakers');
+  const [qShoeSize, setQShoeSize] = useState<string>('40');
   const [qServiceId, setQServiceId] = useState<string>(SERVICES_CATALOG[0].id);
   const [qArea, setQArea] = useState<string>(CIREBON_AREAS[0].name);
 
@@ -94,17 +111,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Filtered orders
-  const pendingOrders = orders.filter(o => !o.isAcceptedByAdmin);
+  const pendingOrders = orders.filter(o => !o.isAcceptedByAdmin && o.status !== 'dibatalkan');
   const inProgressOrders = orders.filter(o => o.isAcceptedByAdmin && (o.status === 'perjalanan_workshop' || o.status === 'pengerjaan' || o.status === 'menunggu_jemput'));
   const readyOrders = orders.filter(o => o.status === 'quality_check' || o.status === 'siap_antar');
   const completedOrders = orders.filter(o => o.status === 'selesai');
+  const cancelledOrders = orders.filter(o => o.status === 'dibatalkan');
+  const outOfStockCount = (Object.values(stockMap) as ServiceStockItem[]).filter(st => st.isOutOfStock || (st.emptySizes && st.emptySizes.length > 0)).length;
 
   const filteredOrders = orders.filter(order => {
     let matchTab = true;
-    if (filterTab === 'pending') matchTab = !order.isAcceptedByAdmin;
+    if (filterTab === 'pending') matchTab = !order.isAcceptedByAdmin && order.status !== 'dibatalkan';
     else if (filterTab === 'in_progress') matchTab = !!order.isAcceptedByAdmin && (order.status === 'perjalanan_workshop' || order.status === 'pengerjaan' || order.status === 'menunggu_jemput');
     else if (filterTab === 'ready') matchTab = order.status === 'quality_check' || order.status === 'siap_antar';
     else if (filterTab === 'completed') matchTab = order.status === 'selesai';
+    else if (filterTab === 'cancelled') matchTab = order.status === 'dibatalkan';
 
     const q = searchQuery.toLowerCase();
     const matchSearch = 
@@ -117,8 +137,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return matchTab && matchSearch;
   });
 
-  // Financial Stats
-  const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+  // Financial Stats (exclude cancelled orders)
+  const totalRevenue = orders.filter(o => o.status !== 'dibatalkan').reduce((sum, o) => sum + o.totalAmount, 0);
 
   // Accept Order Handler
   const handleConfirmAccept = (sendWaToCustomer: boolean, sendWaToCourier: boolean) => {
@@ -149,6 +169,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     const chosenService = SERVICES_CATALOG.find(s => s.id === qServiceId) || SERVICES_CATALOG[0];
     const chosenArea = CIREBON_AREAS.find(a => a.name === qArea) || CIREBON_AREAS[0];
+    const needsSize = isTapakOrSoleSizeRequired([chosenService]);
 
     const newOrder: Order = {
       id: `SLC-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -156,6 +177,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       customerPhone: qCustomerPhone.trim(),
       shoeBrand: qShoeBrand.trim(),
       shoeType: qShoeType,
+      shoeSize: needsSize ? qShoeSize : undefined,
       pairsCount: 1,
       selectedServices: [chosenService],
       pickupType: 'antar_jemput',
@@ -220,7 +242,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {onToggleServiceStock && (
+              <button
+                onClick={() => setShowStockManager(v => !v)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                  showStockManager || outOfStockCount > 0
+                    ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/40'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+                title="Tandai Stok Tapak / Ukuran Sepatu Kosong"
+              >
+                <PackageX className="w-3.5 h-3.5 text-rose-400" />
+                <span>Stok Kosong{outOfStockCount > 0 ? ` (${outOfStockCount})` : ''}</span>
+              </button>
+            )}
             <button
               onClick={() => setQuickOrderModalOpen(true)}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md transition-all"
@@ -294,6 +330,113 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
+      {/* PANEL KELOLA STOK KOSONG REAL-TIME (TAPAK & UKURAN) */}
+      {showStockManager && onToggleServiceStock && (() => {
+        const selectedSrv = SERVICES_CATALOG.find(s => s.id === stockEditServiceId) || SERVICES_CATALOG[0];
+        const currentStock = stockMap[selectedSrv.id];
+        const isOut = Boolean(currentStock?.isOutOfStock);
+        const emptySizes = currentStock?.emptySizes || [];
+        return (
+          <div className="mt-5 p-5 rounded-3xl bg-slate-900 border border-rose-500/40 shadow-xl space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                  <PackageX className="w-4 h-4" /> Manajemen Stok Kosong (Tapak, Ukuran & Bahan)
+                </span>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Tandai menu atau ukuran sepatu yang stoknya kosong agar pelanggan tahu di website dan pesanan bisa dibatalkan.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowStockManager(false)}
+                className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+              <div className="md:col-span-5 space-y-2">
+                <label className="text-xs font-bold text-slate-300 block">Pilih Menu Layanan / Model Tapak:</label>
+                <select
+                  value={stockEditServiceId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setStockEditServiceId(nextId);
+                    setStockEditNote(stockMap[nextId]?.note || '');
+                  }}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-rose-400"
+                >
+                  {SERVICES_CATALOG.map(s => {
+                    const st = stockMap[s.id];
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {st?.isOutOfStock ? '❌ [KOSONG] ' : st?.emptySizes?.length ? `⚠️ [${st.emptySizes.length} Size Kosong] ` : '✅ '}
+                        {s.name}
+                      </option>
+                    );
+                  })}
+                </select>
+                <input
+                  type="text"
+                  value={stockEditNote}
+                  onChange={(e) => setStockEditNote(e.target.value)}
+                  placeholder="Catatan stok (misal: Stok outsole putih sedang kosong)"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-rose-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    onToggleServiceStock(selectedSrv.id, !isOut, emptySizes, stockEditNote || (!isOut ? 'Stok tapak / bahan sedang kosong' : ''));
+                  }}
+                  className={`w-full py-2.5 px-3 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                    isOut
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+                      : 'bg-rose-600 hover:bg-rose-500 text-white'
+                  }`}
+                >
+                  {isOut ? '✅ Aktifkan Kembali (Stok Ada)' : '❌ Tandai Menu Ini STOK KOSONG'}
+                </button>
+              </div>
+
+              <div className="md:col-span-7 space-y-2">
+                <label className="text-xs font-bold text-slate-300 block">
+                  Atau Tandai Ukuran Sepatu / Sandal Tertentu yang Kosong (EU):
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {SHOE_SIZES.map(sz => {
+                    const isSizeEmpty = emptySizes.includes(sz);
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => {
+                          const nextSizes = isSizeEmpty
+                            ? emptySizes.filter(x => x !== sz)
+                            : [...emptySizes, sz];
+                          onToggleServiceStock(selectedSrv.id, isOut, nextSizes, stockEditNote);
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          isSizeEmpty
+                            ? 'bg-rose-600 text-white border-rose-400 shadow-sm'
+                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-rose-500/40'
+                        }`}
+                      >
+                        {isSizeEmpty ? `✕ ${sz}` : sz}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Klik nomor ukuran untuk menandai ukuran tersebut habis. Perubahan langsung sinkron ke halaman pemesanan pelanggan.
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 2. SIMPLE FILTER TABS & SEARCH */}
       <div className="mt-6 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="flex flex-wrap gap-1.5 p-1 rounded-2xl bg-slate-900 border border-slate-800">
@@ -302,6 +445,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             { id: 'in_progress', label: '🛠️ Dikerjakan', count: inProgressOrders.length },
             { id: 'ready', label: '🚚 Siap Antar', count: readyOrders.length },
             { id: 'completed', label: '✅ Selesai', count: completedOrders.length },
+            { id: 'cancelled', label: '❌ Dibatalkan', count: cancelledOrders.length },
             { id: 'all', label: 'Semua', count: orders.length },
           ].map(tab => (
             <button
@@ -395,8 +539,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="py-3 grid grid-cols-1 md:grid-cols-12 gap-3 text-xs">
                 {/* Shoe & Services (5 cols) */}
                 <div className="md:col-span-5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white text-xs">{order.shoeBrand}</span>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-bold text-white text-xs">
+                      {order.shoeBrand}
+                      {order.shoeSize && (
+                        <span className="ml-1.5 px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono text-[10px]">
+                          EU {order.shoeSize}
+                        </span>
+                      )}
+                    </span>
                     <span className="text-amber-400 font-bold font-mono">{order.pairsCount} Pasang</span>
                   </div>
 
@@ -427,6 +578,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </div>
                             <div className="flex flex-wrap gap-1 text-[10px] text-slate-400">
                               <span className="px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800">{sh.shoeType}</span>
+                              {sh.shoeSize && (
+                                <span className="px-1.5 py-0.2 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 font-bold font-mono">
+                                  Ukuran EU {sh.shoeSize}
+                                </span>
+                              )}
                               <span className="px-1.5 py-0.2 rounded bg-slate-900 border border-slate-800 text-amber-300/90">{sh.material}</span>
                             </div>
                             <p className="text-slate-400 text-[10px] line-clamp-2">
@@ -566,7 +722,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 {/* Actions (3 cols) */}
                 <div className="md:col-span-3 flex flex-col justify-center space-y-1.5">
-                  {isPending ? (
+                  {order.status === 'dibatalkan' ? (
+                    <div className="p-2.5 rounded-xl bg-rose-950/50 border border-rose-500/40 space-y-2">
+                      <p className="text-[11px] font-bold text-rose-300 flex items-center gap-1">
+                        <Ban className="w-3.5 h-3.5 shrink-0" />
+                        <span>Dibatalkan{order.isOutOfStockCancelled ? ' (Stok Kosong)' : ''}</span>
+                      </p>
+                      {order.cancellationReason && (
+                        <p className="text-[10px] text-rose-200/80">{order.cancellationReason}</p>
+                      )}
+                      <a
+                        href={buildOutOfStockCancelWhatsAppUrl(order, order.cancellationReason)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-1.5 px-2.5 rounded-lg text-[11px] font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-1"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                        <span>Kirim Info Batal ke WA</span>
+                      </a>
+                    </div>
+                  ) : isPending ? (
                     <div className="space-y-1.5">
                       <button
                         onClick={() => setAcceptingOrder(order)}
@@ -576,10 +751,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <span>Terima Pesanan</span>
                       </button>
                       <button
-                        onClick={() => onRejectOrder(order.id, 'Dibatalkan oleh admin')}
-                        className="w-full py-1.5 rounded-lg text-[11px] text-slate-400 hover:text-red-400 text-center transition-colors"
+                        onClick={() => {
+                          setCancellingOrder(order);
+                          setCancelReason(
+                            order.shoeSize
+                              ? `Ukuran Tapak EU ${order.shoeSize} Kosong`
+                              : 'Stok Tapak / Bahan Sepatu Sedang Kosong'
+                          );
+                        }}
+                        className="w-full py-1.5 px-2 rounded-lg text-[11px] font-semibold bg-rose-950/60 hover:bg-rose-900/70 text-rose-300 border border-rose-500/30 flex items-center justify-center gap-1 transition-colors"
                       >
-                        Tolak / Batalkan
+                        <Ban className="w-3 h-3" />
+                        <span>Batalkan (Stok Kosong)</span>
                       </button>
                     </div>
                   ) : (
@@ -600,7 +783,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {/* Status Dropdown */}
                       <select
                         value={order.status}
-                        onChange={(e) => onUpdateOrderStatus(order.id, e.target.value as OrderStatus)}
+                        onChange={(e) => {
+                          const nextSt = e.target.value as OrderStatus;
+                          if (nextSt === 'dibatalkan') {
+                            setCancellingOrder(order);
+                            setCancelReason(
+                              order.shoeSize
+                                ? `Ukuran Tapak EU ${order.shoeSize} Kosong`
+                                : 'Stok Tapak / Bahan Sepatu Sedang Kosong'
+                            );
+                          } else {
+                            onUpdateOrderStatus(order.id, nextSt);
+                          }
+                        }}
                         className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none focus:border-amber-400"
                       >
                         <option value="menunggu_jemput">Menunggu Jemput</option>
@@ -609,7 +804,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <option value="quality_check">Quality Control</option>
                         <option value="siap_antar">Siap Diantar</option>
                         <option value="selesai">Selesai</option>
+                        <option value="dibatalkan">Dibatalkan (Stok Kosong)</option>
                       </select>
+
+                      <button
+                        onClick={() => {
+                          setCancellingOrder(order);
+                          setCancelReason(
+                            order.shoeSize
+                              ? `Ukuran Tapak EU ${order.shoeSize} Kosong`
+                              : 'Stok Tapak / Bahan Sepatu Sedang Kosong'
+                          );
+                        }}
+                        className="w-full py-1 px-2 rounded-lg text-[10px] font-semibold text-rose-400 hover:bg-rose-950/60 border border-rose-500/20 flex items-center justify-center gap-1 transition-colors"
+                      >
+                        <Ban className="w-3 h-3" />
+                        <span>Stok Kosong / Batalkan</span>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -855,6 +1066,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
+              {(() => {
+                const chosenQuickSrv = SERVICES_CATALOG.find(s => s.id === qServiceId);
+                if (!chosenQuickSrv || !isTapakOrSoleSizeRequired([chosenQuickSrv])) return null;
+                return (
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">Ukuran Sepatu / Sandal (EU):</label>
+                    <div className="flex flex-wrap gap-1">
+                      {SHOE_SIZES.map(sz => (
+                        <button
+                          key={sz}
+                          type="button"
+                          onClick={() => setQShoeSize(sz)}
+                          className={`px-2 py-1 rounded-lg text-[11px] font-bold border ${
+                            qShoeSize === sz
+                              ? 'bg-cyan-500 text-slate-950 border-cyan-400'
+                              : 'bg-slate-950 text-slate-300 border-slate-800'
+                          }`}
+                        >
+                          {sz}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="pt-2 flex gap-2">
                 <button
                   type="submit"
@@ -943,6 +1180,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <option value="quality_check">🔍 Quality Control Lolos & Sterilisasi</option>
                   <option value="siap_antar">🎉 Sepatu Beres & Kurir Siap Mengantar Kembali</option>
                   <option value="selesai">✅ Servis Selesai & Garansi Aktif</option>
+                  <option value="dibatalkan">❌ Dibatalkan (Stok Tapak/Bahan Kosong)</option>
                 </select>
               </div>
 
@@ -962,7 +1200,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="button"
                   onClick={() => {
                     onUpdateOrderStatus(notifModalOrder.id, notifStatus, notifNote.trim() || undefined);
-                    const waUrl = buildStatusNotificationWhatsAppUrl(notifModalOrder, notifStatus, notifNote.trim() || undefined);
+                    const waUrl = notifStatus === 'dibatalkan'
+                      ? buildOutOfStockCancelWhatsAppUrl(notifModalOrder, notifNote.trim() || undefined)
+                      : buildStatusNotificationWhatsAppUrl(notifModalOrder, notifStatus, notifNote.trim() || undefined);
                     window.open(waUrl, '_blank');
                     setNotifModalOrder(null);
                   }}
@@ -1016,6 +1256,100 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs"
               >
                 Tutup Foto
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: BATALKAN PESANAN KARENA STOK KOSONG */}
+      {cancellingOrder && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-3xl bg-slate-900 border border-rose-500/40 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-800 pb-3">
+              <div>
+                <span className="text-[11px] font-black text-rose-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Ban className="w-3.5 h-3.5" /> Batalkan Order (Stok Kosong)
+                </span>
+                <h3 className="text-base font-extrabold text-white mt-0.5">
+                  #{cancellingOrder.id} — {cancellingOrder.customerName}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {cancellingOrder.shoeBrand}{cancellingOrder.shoeSize ? ` • Ukuran EU ${cancellingOrder.shoeSize}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCancellingOrder(null)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <label className="block font-bold text-slate-300">Pilih Alasan Cepat Stok Kosong:</label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Stok Tapak / Outsole Kosong',
+                  `Ukuran Tapak EU ${cancellingOrder.shoeSize || '40'} Kosong`,
+                  'Bahan Sol Belum Tersedia di Workshop',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setCancelReason(preset)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border cursor-pointer ${
+                      cancelReason === preset
+                        ? 'bg-rose-500 text-white border-rose-400'
+                        : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-rose-500/40'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                rows={2}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-rose-400"
+              />
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const finalReason = cancelReason.trim() || 'Stok Kosong';
+                  if (onCancelOrder) {
+                    onCancelOrder(cancellingOrder.id, finalReason, true, adminUser.name);
+                  } else {
+                    onRejectOrder(cancellingOrder.id, finalReason);
+                  }
+                  const waUrl = buildOutOfStockCancelWhatsAppUrl(cancellingOrder, finalReason);
+                  window.open(waUrl, '_blank');
+                  setCancellingOrder(null);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Batalkan & Kirim Info Stok Kosong ke WA</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const finalReason = cancelReason.trim() || 'Stok Kosong';
+                  if (onCancelOrder) {
+                    onCancelOrder(cancellingOrder.id, finalReason, true, adminUser.name);
+                  } else {
+                    onRejectOrder(cancellingOrder.id, finalReason);
+                  }
+                  setCancellingOrder(null);
+                }}
+                className="w-full py-2 px-4 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
+              >
+                Batalkan Saja (Tanpa Buka WA)
               </button>
             </div>
           </div>

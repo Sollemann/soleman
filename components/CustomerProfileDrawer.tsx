@@ -119,27 +119,40 @@ export const CustomerProfileDrawer: React.FC<CustomerProfileDrawerProps> = ({
             ) : (
               <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
                 {customerOrders.map(order => {
-                  const statusInfo = STATUS_LABELS[order.status];
+                  const statusInfo = STATUS_LABELS[order.status] || {
+                    label: order.status,
+                    color: 'text-slate-300',
+                    badgeBg: 'bg-slate-800 text-slate-200 border-slate-700',
+                  };
                   return (
                     <div
                       key={order.id}
-                      onClick={() => { onClose(); onTrackOrder(order.id); }}
-                      className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-amber-500/40 cursor-pointer transition-all space-y-2"
+                      className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2"
                     >
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-mono font-bold text-amber-400">#{order.id}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${statusInfo.badgeClass}`}>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${statusInfo.badgeBg}`}>
                           {statusInfo.label}
                         </span>
                       </div>
                       <div className="text-xs font-bold text-white truncate">
-                        {order.shoeBrand} • {order.pairsCount} Pasang
+                        {order.shoeBrand} • {order.pairsCount} Pasang{order.shoeSize ? ` (EU ${order.shoeSize})` : ''}
                       </div>
+                      {order.status === 'dibatalkan' && order.cancellationReason && (
+                        <div className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-lg px-2.5 py-1.5">
+                          Alasan Batal: {order.cancellationReason}
+                        </div>
+                      )}
                       <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-900">
                         <span>Rp {order.totalAmount.toLocaleString('id-ID')}</span>
-                        <span className="text-amber-400 font-semibold flex items-center gap-1">
-                          Lacak Progres <ChevronRight className="w-3.5 h-3.5" />
-                        </span>
+                        <a
+                          href={`https://wa.me/6283152276387?text=${encodeURIComponent(`Halo Admin Soleman, saya ${order.customerName} ingin menanyakan status Order #${order.id} (${order.shoeBrand}).`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-400 hover:underline font-semibold flex items-center gap-1"
+                        >
+                          Tanya via WA <ExternalLink className="w-3 h-3" />
+                        </a>
                       </div>
                     </div>
                   );

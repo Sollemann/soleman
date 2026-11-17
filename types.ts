@@ -80,7 +80,17 @@ export type OrderStatus =
   | 'pengerjaan'
   | 'quality_check'
   | 'siap_antar'
-  | 'selesai';
+  | 'selesai'
+  | 'dibatalkan';
+
+export interface ServiceStockItem {
+  serviceId: string;
+  isOutOfStock: boolean;
+  emptySizes?: string[]; // Ukuran tapak yang sedang kosong (opsional)
+  note?: string;
+  updatedAt?: string;
+  updatedAtMs?: number;
+}
 
 export type PaymentMethod = 'qris' | 'cod';
 
@@ -119,6 +129,7 @@ export interface ShoeItemDetail {
   pairNumber: number;
   shoeBrand: string;
   shoeType: ShoeType;
+  shoeSize?: string; // Ukuran sepatu/sandal (khususnya untuk ganti tapak)
   material: ShoeMaterial;
   severity: DamageSeverity;
   selectedServices: ServiceItem[];
@@ -134,6 +145,7 @@ export interface Order {
   customerPhone: string;
   shoeBrand: string;
   shoeType: ShoeType;
+  shoeSize?: string; // Ukuran sepatu/sandal utama
   material?: ShoeMaterial;
   severity?: DamageSeverity;
   pairsCount: number;
@@ -164,6 +176,10 @@ export interface Order {
   assignedCourier?: string;
   assignedCourierPhone?: string;
   internalAdminNotes?: string;
+  cancellationReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  isOutOfStockCancelled?: boolean;
 }
 
 export interface CustomerUser {

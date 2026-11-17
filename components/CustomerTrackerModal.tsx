@@ -203,7 +203,7 @@ export const CustomerTrackerModal: React.FC<CustomerTrackerModalProps> = ({
                 </div>
                 <div className="text-right">
                   <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-cyan-950 text-cyan-300 border border-cyan-400/40 shadow-[0_0_10px_rgba(0,240,255,0.2)]">
-                    {STATUS_LABELS[searchedOrder.status] || searchedOrder.status}
+                    {STATUS_LABELS[searchedOrder.status]?.label || searchedOrder.status}
                   </span>
                   <span className="text-[10px] text-slate-500 block mt-1">
                     Masuk: {searchedOrder.createdAt}
@@ -277,7 +277,7 @@ export const CustomerTrackerModal: React.FC<CustomerTrackerModalProps> = ({
                 </div>
 
                 <a
-                  href={`https://wa.me/62${(searchedOrder.assignedCourierPhone || '08814519955').replace(/^0/, '')}?text=${encodeURIComponent(`Halo Kurir Soleman, saya ${searchedOrder.customerName} ingin menanyakan penjemputan/pengantaran sepatu #${searchedOrder.id} di ${searchedOrder.location.areaName}`)}`}
+                  href={`https://wa.me/62${(searchedOrder.assignedCourierPhone || '083152276387').replace(/^0/, '')}?text=${encodeURIComponent(`Halo Kurir Soleman, saya ${searchedOrder.customerName} ingin menanyakan penjemputan/pengantaran sepatu #${searchedOrder.id} di ${searchedOrder.location.areaName}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs inline-flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20 shrink-0 cursor-pointer"

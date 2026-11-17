@@ -32,19 +32,9 @@ interface HeroProps {
 
 export const Hero: React.FC<HeroProps> = ({
   onOpenBooking,
-  onSearchOrder,
   onExploreServices,
   onOpenQrModal
 }) => {
-  const [orderQuery, setOrderQuery] = useState('');
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    soundFx.playClick();
-    if (orderQuery.trim()) {
-      onSearchOrder(orderQuery.trim());
-    }
-  };
 
   const scrollToElement = (id: string) => {
     soundFx.playClick();
@@ -162,34 +152,6 @@ export const Hero: React.FC<HeroProps> = ({
                   <span>Kode QR DANA Resmi</span>
                 </button>
               )}
-            </div>
-
-            {/* Quick Order Tracker Bar */}
-            <div className="pt-1">
-              <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-700/70 max-w-lg shadow-sm">
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
-                  <span className="flex items-center gap-1.5 text-slate-200 font-semibold">
-                    <Search className="w-3.5 h-3.5 text-cyan-400" /> Lacak Status Sepatu Anda
-                  </span>
-                  <span className="text-[11px] text-slate-500 font-mono">Misal: 3891 / SLC-3891</span>
-                </div>
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={orderQuery}
-                    onChange={(e) => setOrderQuery(e.target.value)}
-                    placeholder="Masukkan Nomor Seri Sepatu..."
-                    className="flex-1 bg-slate-950/80 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold text-xs rounded-lg transition-all shrink-0 flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>Lacak</span>
-                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                  </button>
-                </form>
-              </div>
             </div>
 
           </div>

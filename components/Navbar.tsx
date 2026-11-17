@@ -75,7 +75,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'layanan', label: 'Pilih Kerusakan', icon: Wrench },
     { id: 'kalkulator', label: 'Kalkulator', icon: Calculator },
     { id: 'antar-jemput', label: 'Antar-Jemput', icon: Truck },
-    { id: 'dashboard', label: 'Lacak Sepatu', icon: Search },
   ];
 
   const handleNavClick = (id: string) => {
@@ -334,7 +333,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-sky-950/40 text-sky-300 border border-sky-500/30 hover:bg-sky-950/60 transition-all cursor-pointer"
                 >
                   <QrCode className="w-4 h-4 text-sky-400" />
-                  <span>📱 Kode QR DANA Workshop (0881-4519-955)</span>
+                  <span>📱 Kode QR DANA Workshop (0831-5227-6387)</span>
                 </button>
               )}
 

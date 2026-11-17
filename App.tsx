@@ -8,13 +8,11 @@ import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { DamageCatalog } from './components/DamageCatalog';
 import { PickupOrderSection } from './components/PickupOrderSection';
-import { DashboardView } from './components/DashboardView';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { CourierDashboard } from './components/CourierDashboard';
 import { CourierLoginModal } from './components/CourierLoginModal';
 import { TestimonialsAndFaq } from './components/TestimonialsAndFaq';
-import { CustomerTrackerModal } from './components/CustomerTrackerModal';
 import { StaffAccessModal } from './components/StaffAccessModal';
 import { CustomerAuthModal } from './components/CustomerAuthModal';
 import { CustomerProfileDrawer } from './components/CustomerProfileDrawer';
@@ -23,12 +21,12 @@ import { SolemanQrModal } from './components/SolemanQrModal';
 import { SolemanLogo } from './components/SolemanLogo';
 import { RepairCostCalculator } from './components/RepairCostCalculator';
 import { Footer } from './components/Footer';
-import { INITIAL_ORDERS, WORKSHOP_INFO, SERVICES_CATALOG } from './data/solcreftData';
-import { Order, OrderStatus, ServiceItem, ShoeType, DamageSeverity, AdminUser, CourierUser, CustomerUser, PaymentStatus } from './types';
+import { WORKSHOP_INFO, SERVICES_CATALOG } from './data/solcreftData';
+import { Order, OrderStatus, ServiceItem, ShoeType, DamageSeverity, AdminUser, CourierUser, CustomerUser, PaymentStatus, ServiceStockItem } from './types';
 import { adminAuthService } from './services/adminAuthService';
 import { courierAuthService } from './services/courierAuthService';
 import { customerAuthService } from './services/customerAuthService';
-import { MessageSquare, Phone, Truck, Lock, ShieldCheck, CheckCircle2, Bot, LogOut, Wrench, Search, MapPin, WifiOff, AlertTriangle, RefreshCw } from 'lucide-react';
+import { MessageSquare, Truck, Bot, LogOut, Wrench, AlertTriangle, RefreshCw, Calculator, WifiOff } from 'lucide-react';
 import { soundFx } from './services/soundEffects';
 import {
   subscribeToOrdersRealtime,
@@ -38,11 +36,13 @@ import {
   FirestoreSyncState,
   ORDERS_COLLECTION,
 } from './services/firebaseOrderService';
+import { subscribeToStockStatus, saveServiceStockStatus } from './services/firebaseStockService';
 import { FIRESTORE_DATABASE_ID } from './firebase';
 
 export const App: React.FC = () => {
   // Orders State: 100% Real-Time dari Firebase Firestore (default) koleksi 'oderan' (Tanpa localStorage & Tanpa Data Contoh)
   const [orders, setOrders] = useState<Order[]>([]);
+  const [stockMap, setStockMap] = useState<Record<string, ServiceStockItem>>({});
   const [firestoreSyncState, setFirestoreSyncState] = useState<FirestoreSyncState>('connecting');
   const [firebaseError, setFirebaseError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState<number>(0);
@@ -73,10 +73,8 @@ export const App: React.FC = () => {
   // Workshop DANA & QRIS QR Code Modal State
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
-  // Navigation & Modal State
+  // Navigation & Preselection State
   const [activeTab, setActiveTab] = useState<string>('layanan');
-  const [isTrackerOpen, setIsTrackerOpen] = useState(false);
-  const [trackerQuery, setTrackerQuery] = useState('');
 
   // Preselected data for Pickup Section
   const [preselectedServices, setPreselectedServices] = useState<ServiceItem[]>([]);
@@ -84,6 +82,7 @@ export const App: React.FC = () => {
   const [preselectedSeverity, setPreselectedSeverity] = useState<DamageSeverity>('normal');
   const [preselectedPairsCount, setPreselectedPairsCount] = useState<number>(1);
   const [preselectedArea, setPreselectedArea] = useState<string>('');
+  const [preselectedShoeSize, setPreselectedShoeSize] = useState<string>('40');
 
   // Count pending unaccepted orders
   const pendingOrdersCount = orders.filter(o => !o.isAcceptedByAdmin).length;
@@ -109,6 +108,10 @@ export const App: React.FC = () => {
         setFirebaseError(errMsg);
       }
     );
+
+    const unsubscribeStock = subscribeToStockStatus((nextStockMap) => {
+      setStockMap(nextStockMap);
+    });
 
     // Check URL parameter ?kurir_order= from WhatsApp link
     try {
@@ -149,6 +152,7 @@ export const App: React.FC = () => {
 
     return () => {
       unsubscribeFirestore();
+      unsubscribeStock();
     };
   }, [retryTrigger]);
 
@@ -167,13 +171,10 @@ export const App: React.FC = () => {
       return [orderWithCustomer, ...prev];
     });
     void saveOrderToFirestore(orderWithCustomer, true, setFirebaseError);
-    // Lacak kode seri otomatis saat pelanggan order tanpa mengetik lagi
-    setTrackerQuery(orderWithCustomer.id);
-    setIsTrackerOpen(true);
   };
 
   // Handle accepting order by Admin or Courier Soleman & sync immediately to Firebase Firestore (default)
-  const handleAcceptOrder = (orderId: string, courierName: string = 'Kurir Soleman', courierPhone: string = '08814519955') => {
+  const handleAcceptOrder = (orderId: string, courierName: string = 'Kurir Soleman', courierPhone: string = '083152276387') => {
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
     setOrders(prev => prev.map(order => {
       if (order.id !== orderId) return order;
@@ -231,28 +232,64 @@ export const App: React.FC = () => {
     void deleteOrderFromFirestore(orderId, setFirebaseError);
   };
 
-  // Handle rejecting order by Admin & sync to Firebase Firestore (default)
-  const handleRejectOrder = (orderId: string, reason: string) => {
+  // Handle canceling order (especially due to Out-of-Stock / Stok Kosong) & sync immediately to Firestore
+  const handleCancelOrder = (
+    orderId: string,
+    reason: string,
+    isOutOfStock: boolean = true,
+    cancelledBy: string = 'Admin/Kurir Soleman'
+  ) => {
     const timeStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
     setOrders(prev => prev.map(order => {
       if (order.id !== orderId) return order;
 
-      const rejectTimeline = {
-        status: 'menunggu_jemput' as OrderStatus,
-        label: 'Pesanan Dibatalkan',
+      const cancelTimeline = {
+        status: 'dibatalkan' as OrderStatus,
+        label: isOutOfStock ? 'Dibatalkan (Stok Tapak/Bahan Kosong)' : 'Pesanan Dibatalkan',
         timestamp: timeStr,
-        description: `Pesanan dibatalkan/ditolak admin: ${reason}`
+        description: `Pesanan dibatalkan oleh ${cancelledBy}: ${reason}`
       };
 
       const updatedOrder: Order = {
         ...order,
-        isAcceptedByAdmin: false,
-        customNotes: (order.customNotes ? order.customNotes + ' • ' : '') + `[Admin: ${reason}]`,
-        timeline: [rejectTimeline, ...order.timeline]
+        status: 'dibatalkan',
+        isAcceptedByAdmin: true,
+        cancellationReason: reason,
+        cancelledAt: timeStr + ' WIB',
+        cancelledBy,
+        isOutOfStockCancelled: isOutOfStock,
+        customNotes: (order.customNotes ? order.customNotes + ' • ' : '') + `[Batal: ${reason}]`,
+        timeline: [cancelTimeline, ...order.timeline]
       };
       void saveOrderToFirestore(updatedOrder, false, setFirebaseError);
       return updatedOrder;
     }));
+  };
+
+  // Handle toggling out-of-stock status per service/size in Firestore
+  const handleToggleServiceStock = async (
+    serviceId: string,
+    isOutOfStock: boolean,
+    emptySizes: string[] = [],
+    note: string = ''
+  ) => {
+    setStockMap(prev => ({
+      ...prev,
+      [serviceId]: {
+        serviceId,
+        isOutOfStock,
+        emptySizes,
+        note,
+        updatedAt: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }),
+        updatedAtMs: Date.now(),
+      },
+    }));
+    await saveServiceStockStatus(serviceId, isOutOfStock, emptySizes, note);
+  };
+
+  // Handle rejecting order by Admin & sync to Firebase Firestore (default)
+  const handleRejectOrder = (orderId: string, reason: string) => {
+    handleCancelOrder(orderId, reason, reason.toLowerCase().includes('stok'), adminUser?.name || 'Admin Soleman');
   };
 
   // Handle updating order status (jemput, workshop, siap antar, selesai) & sync immediately to Firebase Firestore (default)
@@ -379,6 +416,7 @@ export const App: React.FC = () => {
       case 'quality_check': return 'Quality Control Lolos';
       case 'siap_antar': return 'Siap Diantar Kurir';
       case 'selesai': return 'Selesai & Diterima Pelanggan';
+      case 'dibatalkan': return 'Pesanan Dibatalkan (Stok Kosong)';
       default: return 'Update Progres';
     }
   };
@@ -397,6 +435,8 @@ export const App: React.FC = () => {
         return `Sepatu selesai direparasi dan dijadwalkan pengantaran kembali oleh Kurir Soleman.`;
       case 'selesai':
         return `Sepatu telah diserahterimakan kepada ${order.customerName}. Garansi servis Soleman aktif.`;
+      case 'dibatalkan':
+        return `Pesanan dibatalkan (${order.cancellationReason || 'Stok tapak / bahan sedang kosong'}).`;
       default:
         return 'Status diperbarui oleh sistem.';
     }
@@ -429,20 +469,23 @@ export const App: React.FC = () => {
     pairsCount: number;
     areaName: string;
     severity?: DamageSeverity;
+    shoeSize?: string;
   }) => {
     setPreselectedServices(data.services);
     setPreselectedShoeType(data.shoeType);
     if (data.severity) {
       setPreselectedSeverity(data.severity);
     }
+    if (data.shoeSize) {
+      setPreselectedShoeSize(data.shoeSize);
+    }
     setPreselectedPairsCount(data.pairsCount);
     setPreselectedArea(data.areaName);
     handleScrollToSection('antar-jemput');
   };
 
-  const handleSearchOrder = (query: string) => {
-    setTrackerQuery(query);
-    setIsTrackerOpen(true);
+  const handleSearchOrder = (_query: string) => {
+    handleScrollToSection('antar-jemput');
   };
 
   const handleScrollToSection = (sectionId: string) => {
@@ -536,6 +579,9 @@ export const App: React.FC = () => {
           <AdminDashboard
             adminUser={adminUser}
             orders={orders}
+            stockMap={stockMap}
+            onToggleServiceStock={handleToggleServiceStock}
+            onCancelOrder={handleCancelOrder}
             onUpdateOrderStatus={handleUpdateOrderStatus}
             onAcceptOrder={handleAcceptOrder}
             onRejectOrder={handleRejectOrder}
@@ -621,6 +667,9 @@ export const App: React.FC = () => {
           <CourierDashboard
             courierUser={courierUser}
             orders={orders}
+            stockMap={stockMap}
+            onToggleServiceStock={handleToggleServiceStock}
+            onCancelOrder={handleCancelOrder}
             onAcceptOrder={handleAcceptOrder}
             onOrderCreated={handleOrderCreated}
             onUpdateOrderStatus={handleUpdateOrderStatus}
@@ -653,7 +702,7 @@ export const App: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={handleScrollToSection}
         onOpenBooking={() => handleScrollToSection('antar-jemput')}
-        onOpenTracker={() => { setTrackerQuery(''); setIsTrackerOpen(true); }}
+        onOpenTracker={() => handleScrollToSection('antar-jemput')}
         ordersCount={orders.length}
         adminUser={null}
         courierUser={null}
@@ -678,50 +727,43 @@ export const App: React.FC = () => {
 
       {/* Main Content Sections Pelanggan */}
       <main className="flex-1 pb-24 lg:pb-0">
-        {/* 1. Hero Section dengan Quick Tracker, Bot WA & Tombol Pintas */}
+        {/* 1. Hero Section */}
         <Hero
           onOpenBooking={() => handleScrollToSection('antar-jemput')}
           onSearchOrder={handleSearchOrder}
           onExploreServices={() => handleScrollToSection('layanan')}
-          onOpenDashboard={() => handleScrollToSection('dashboard')}
+          onOpenDashboard={() => handleScrollToSection('antar-jemput')}
           onOpenWaBot={() => setIsWaBotModalOpen(true)}
           onOpenQrModal={() => setIsQrModalOpen(true)}
         />
 
-        {/* 2. PILIH SESUAI KERUSAKAN SEPATU ANDA (Dipindah ke paling atas langsung di bawah Hero) */}
+        {/* 2. PILIH SESUAI KERUSAKAN SEPATU & SANDAL ANDA */}
         <DamageCatalog
+          stockMap={stockMap}
           onSelectServiceForPickup={handleSelectServiceForPickup}
         />
 
         {/* 3. Instant Repair Cost & Time Calculator */}
         <RepairCostCalculator
+          stockMap={stockMap}
           onApplyEstimate={handleApplyEstimate}
         />
 
-        {/* 4. Booking Antar-Jemput: Ongkir 15k, Deteksi Kerusakan Otomatis dari Foto */}
+        {/* 4. Booking Antar-Jemput + Bagi Lokasi Akurat ke Kurir */}
         <PickupOrderSection
           initialServices={preselectedServices}
           initialShoeType={preselectedShoeType}
           initialSeverity={preselectedSeverity}
           initialPairsCount={preselectedPairsCount}
           initialArea={preselectedArea}
+          initialShoeSize={preselectedShoeSize}
+          stockMap={stockMap}
           customerUser={customerUser}
           onOrderCreated={handleOrderCreated}
-          onOpenDashboard={() => handleScrollToSection('dashboard')}
-          onOpenTrackerWithId={(id) => {
-            setTrackerQuery(id);
-            setIsTrackerOpen(true);
-          }}
+          onOpenDashboard={() => handleScrollToSection('antar-jemput')}
         />
 
-        {/* 5. DASHBOARD PELANGGAN: Pelacakan Sepatu & Berbagi Lokasi Terkini ke Kurir */}
-        <DashboardView
-          orders={orders}
-          onOpenBooking={() => handleScrollToSection('antar-jemput')}
-          onUpdateOrderLocation={handleUpdateOrderLocation}
-        />
-
-        {/* 6. Testimonials & FAQs + Write Review Form */}
+        {/* 5. Testimonials & FAQs + Write Review Form */}
         <TestimonialsAndFaq />
       </main>
 
@@ -741,32 +783,24 @@ export const App: React.FC = () => {
         courierUser={courierUser}
         onAdminLogout={handleAdminLogout}
         onCourierLogout={handleCourierLogout}
-        onOpenDashboard={() => handleScrollToSection('dashboard')}
+        onOpenDashboard={() => handleScrollToSection('antar-jemput')}
       />
 
-      {/* Customer Tracking Modal */}
-      <CustomerTrackerModal
-        isOpen={isTrackerOpen}
-        onClose={() => setIsTrackerOpen(false)}
-        orders={orders}
-        initialQuery={trackerQuery}
-      />
-
-      {/* Admin Login Modal (password Hafidahcantik87) */}
+      {/* Admin Login Modal */}
       <AdminLoginModal
         isOpen={isAdminLoginModalOpen}
         onClose={() => setIsAdminLoginModalOpen(false)}
         onLoginSuccess={handleAdminLoginSuccess}
       />
 
-      {/* Courier Login Modal (password Herdazabuza) */}
+      {/* Courier Login Modal */}
       <CourierLoginModal
         isOpen={isCourierLoginModalOpen}
         onClose={() => setIsCourierLoginModalOpen(false)}
         onLoginSuccess={handleCourierLoginSuccess}
       />
 
-      {/* Customer Auth Modal (Daftar & Login Sederhana Standar Keamanan Tinggi FB) */}
+      {/* Customer Auth Modal */}
       <CustomerAuthModal
         isOpen={isCustomerAuthModalOpen}
         onClose={() => setIsCustomerAuthModalOpen(false)}
@@ -784,10 +818,9 @@ export const App: React.FC = () => {
           customerUser={customerUser}
           orders={orders}
           onLogout={handleCustomerLogout}
-          onTrackOrder={(orderId) => {
+          onTrackOrder={() => {
             setIsCustomerProfileOpen(false);
-            setTrackerQuery(orderId);
-            setIsTrackerOpen(true);
+            handleScrollToSection('antar-jemput');
           }}
           onOpenBooking={() => {
             setIsCustomerProfileOpen(false);
@@ -837,10 +870,10 @@ export const App: React.FC = () => {
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 px-4 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-full shadow-2xl shadow-amber-500/30 hover:scale-105 active:scale-95 transition-all border border-amber-300/40"
-          title="Chat WhatsApp Soleman Cirebon: 0881-4519-955"
+          title="Chat WhatsApp Soleman Cirebon: 0831-5227-6387"
         >
           <MessageSquare className="w-4 h-4 fill-slate-950" />
-          <span>WA: 0881-4519-955</span>
+          <span>WA: 0831-5227-6387</span>
         </a>
       </div>
 
@@ -881,20 +914,22 @@ export const App: React.FC = () => {
         </button>
 
         <button
-          onClick={() => { setTrackerQuery(''); setIsTrackerOpen(true); }}
+          onClick={() => handleScrollToSection('kalkulator')}
           className="flex flex-col items-center gap-1 text-slate-400 hover:text-white"
         >
-          <CheckCircle2 className="w-4 h-4 text-sky-400" />
-          <span>Lacak</span>
+          <Calculator className="w-4 h-4 text-sky-400" />
+          <span>Hitung</span>
         </button>
 
-        <button
-          onClick={() => handleScrollToSection('workshop')}
+        <a
+          href={`https://wa.me/${WORKSHOP_INFO.phone}?text=${encodeURIComponent('Halo Soleman Cirebon! Saya ingin konsultasi perbaikan sepatu/sandal.')}`}
+          target="_blank"
+          rel="noopener noreferrer"
           className="flex flex-col items-center gap-1 text-slate-400 hover:text-white"
         >
-          <MapPin className="w-4 h-4 text-amber-400" />
-          <span>Lokasi</span>
-        </button>
+          <MessageSquare className="w-4 h-4 text-emerald-400" />
+          <span>WA CS</span>
+        </a>
       </div>
 
     </div>

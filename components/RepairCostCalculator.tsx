@@ -14,22 +14,36 @@ import {
   Sparkles, 
   RotateCcw
 } from 'lucide-react';
-import { ShoeType, ServiceItem, DamageSeverity } from '../types';
-import { SERVICES_CATALOG, CIREBON_AREAS, DAMAGE_SEVERITIES, getServiceTierDetail } from '../data/solcreftData';
+import { ShoeType, ServiceItem, DamageSeverity, ServiceStockItem } from '../types';
+import {
+  SERVICES_CATALOG,
+  CIREBON_AREAS,
+  DAMAGE_SEVERITIES,
+  SHOE_SIZES,
+  isTapakOrSoleSizeRequired,
+  getServiceTierDetail,
+} from '../data/solcreftData';
+import { isServiceOrSizeOutOfStock } from '../services/firebaseStockService';
 import { soundFx } from '../services/soundEffects';
 
 interface RepairCostCalculatorProps {
+  stockMap?: Record<string, ServiceStockItem>;
   onApplyEstimate: (data: {
     services: ServiceItem[];
     shoeType: ShoeType;
     pairsCount: number;
     areaName: string;
     severity: DamageSeverity;
+    shoeSize?: string;
   }) => void;
 }
 
-export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onApplyEstimate }) => {
+export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
+  stockMap,
+  onApplyEstimate,
+}) => {
   const [shoeType, setShoeType] = useState<ShoeType>('Sneakers');
+  const [shoeSize, setShoeSize] = useState<string>('40');
   const [severity, setSeverity] = useState<DamageSeverity>('normal');
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(['jahit-benang-tersembunyi']);
   const [pairsCount, setPairsCount] = useState<number>(1);
@@ -41,10 +55,14 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
     { type: 'Sepatu Kantor / Pantofel', label: 'Kulit / Pantofel', icon: '👞' },
     { type: 'Sepatu Futsal', label: 'Sepatu Futsal', icon: '⚽' },
     { type: 'Sepatu Gunung / Hiking', label: 'Gunung / Hiking', icon: '⛰️' },
-    { type: 'Sepatu Trail', label: 'Sepatu Trail', icon: '🏔️' }
+    { type: 'Sepatu Trail', label: 'Sepatu Trail', icon: '🏔️' },
+    { type: 'Sendal Biasa', label: 'Sandal / Jepit', icon: '🩴' },
+    { type: 'Sendal Kulit', label: 'Sandal Kulit', icon: '👡' },
   ];
 
   const handleToggleService = (id: string) => {
+    const stockCheck = isServiceOrSizeOutOfStock(stockMap, id);
+    if (stockCheck.blocked && !selectedServiceIds.includes(id)) return;
     soundFx.playClick();
     setSelectedServiceIds(prev => {
       if (prev.includes(id)) {
@@ -60,6 +78,11 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
     const found = SERVICES_CATALOG.filter(s => selectedServiceIds.includes(s.id));
     return found.length > 0 ? found : [SERVICES_CATALOG[0]];
   }, [selectedServiceIds]);
+
+  const needsShoeSize = useMemo(
+    () => isTapakOrSoleSizeRequired(selectedServices),
+    [selectedServices]
+  );
 
   const selectedAreaObj = useMemo(() => {
     return CIREBON_AREAS.find(a => a.name === selectedAreaName) || CIREBON_AREAS[0];
@@ -129,7 +152,8 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
       shoeType,
       pairsCount,
       areaName: selectedAreaName,
-      severity
+      severity,
+      shoeSize: needsShoeSize ? shoeSize : undefined,
     });
   };
 
@@ -139,6 +163,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
     setSeverity('normal');
     setPairsCount(1);
     setShoeType('Sneakers');
+    setShoeSize('40');
     setSelectedAreaName(CIREBON_AREAS[0].name);
   };
 
@@ -279,16 +304,21 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
               {SERVICES_CATALOG.map(srv => {
                 const isChecked = selectedServiceIds.includes(srv.id);
                 const tierInfo = getServiceTierDetail(srv, severity);
+                const stockCheck = isServiceOrSizeOutOfStock(stockMap, srv.id, isTapakOrSoleSizeRequired([srv]) ? shoeSize : undefined);
+                const isOut = stockCheck.blocked && !isChecked;
 
                 return (
                   <button
                     key={srv.id}
                     type="button"
+                    disabled={isOut}
                     onClick={() => handleToggleService(srv.id)}
-                    className={`p-3 rounded-2xl text-left border transition-all flex items-start gap-2.5 cursor-pointer ${
-                      isChecked
-                        ? 'bg-cyan-950/40 border-cyan-400 text-white shadow-[0_0_12px_rgba(0,240,255,0.2)]'
-                        : 'bg-slate-950 border-slate-800/90 text-slate-400 hover:border-slate-700'
+                    className={`p-3 rounded-2xl text-left border transition-all flex items-start gap-2.5 ${
+                      isOut
+                        ? 'bg-rose-950/20 border-rose-500/30 text-slate-500 opacity-70 cursor-not-allowed'
+                        : isChecked
+                        ? 'bg-cyan-950/40 border-cyan-400 text-white shadow-[0_0_12px_rgba(0,240,255,0.2)] cursor-pointer'
+                        : 'bg-slate-950 border-slate-800/90 text-slate-400 hover:border-slate-700 cursor-pointer'
                     }`}
                   >
                     <div className={`w-4 h-4 rounded-md mt-0.5 flex items-center justify-center shrink-0 border ${
@@ -299,12 +329,18 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-bold leading-tight text-white truncate">{srv.name}</span>
-                        <span className="text-xs text-cyan-300 font-mono font-black shrink-0">
-                          {tierInfo.priceFormatted}
-                        </span>
+                        {stockCheck.blocked ? (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-600 text-white shrink-0">
+                            STOK KOSONG
+                          </span>
+                        ) : (
+                          <span className="text-xs text-cyan-300 font-mono font-black shrink-0">
+                            {tierInfo.priceFormatted}
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-cyan-400/90 font-semibold mt-0.5 truncate">
-                        • {tierInfo.label}
+                        {stockCheck.blocked ? stockCheck.reason : `• ${tierInfo.label}`}
                       </div>
                       <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
                         {tierInfo.damageDesc}
@@ -314,6 +350,48 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
                 );
               })}
             </div>
+
+            {/* Shoe Size Picker whenever a Ganti Tapak / Tambal service is selected */}
+            {needsShoeSize && (
+              <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-cyan-500/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-cyan-300">
+                    Ukuran Sepatu / Sandal untuk Tapak (EU):
+                  </label>
+                  <span className="text-xs font-mono font-bold text-white bg-cyan-500/20 border border-cyan-400/40 px-2 py-0.5 rounded-lg">
+                    EU {shoeSize}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {SHOE_SIZES.map((sz) => {
+                    const sizeBlocked = selectedServices.some(
+                      (srv) => isServiceOrSizeOutOfStock(stockMap, srv.id, sz).blocked
+                    );
+                    const isSelectedSize = shoeSize === sz;
+                    return (
+                      <button
+                        key={sz}
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          setShoeSize(sz);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                          sizeBlocked
+                            ? 'bg-rose-950/40 border-rose-500/40 text-rose-300 line-through'
+                            : isSelectedSize
+                            ? 'bg-cyan-400 text-slate-950 border-cyan-300 font-black shadow-sm'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-cyan-500/40'
+                        }`}
+                        title={sizeBlocked ? `Stok ukuran ${sz} kosong` : `Ukuran EU ${sz}`}
+                      >
+                        {sz}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Step 4: Jumlah Pasang & Lokasi Kecamatan Cirebon */}
@@ -396,7 +474,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({ onAp
             </div>
             <h3 className="text-xl font-bold text-white">Ringkasan Kerusakan & Biaya</h3>
             <p className="text-xs text-slate-400">
-              Untuk {pairsCount} pasang {shoeType} • Wilayah {selectedAreaObj.type} Cirebon
+              Untuk {pairsCount} pasang {shoeType}{needsShoeSize ? ` (Ukuran EU ${shoeSize})` : ''} • Wilayah {selectedAreaObj.type} Cirebon
             </p>
           </div>
 

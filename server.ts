@@ -32,7 +32,7 @@ async function startServer() {
     res.json({
       status: 'ok',
       hasGeminiKey: !!apiKey,
-      model: 'gemini-3.8-flash',
+      model: 'gemini-4-hydrogen',
       service: 'Soleman Cirebon AI Repair Engine',
     });
   });
@@ -94,6 +94,9 @@ KATALOG LAYANAN RESMI SOLEMAN CIREBON & ID RESMI:
 18. Deep Clean & Sterilisasi Antibakteri: "deep-clean" (Rp 35.000) - Cuci luar dalam bebas jamur & bau.
 19. Reparasi Busa & Kain Tumit: "heel-repair" (Rp 50.000) - Busa tumit robek anti lecet kaki.
 20. Patching Upper Robek: "patch-upper" (Rp 45.000) - Tambal kanvas/kulit bolong rapi.
+21. Tambal Hak / Tumit (Sepatu & Sandal): "tambal-hak-tumit" (Rp 35.000) - Tambal hak tumit miring/aus.
+22. Tambal Bawah Setengah Sol / Half-Sole: "tambal-bawah-setengah" (Rp 45.000) - Tambal karet bawah setengah (depan/belakang) untuk sepatu & sandal.
+23. Tambal Bawah Full / Semuanya: "tambal-bawah-semua" (Rp 70.000) - Tambal karet full seluruh permukaan bawah sepatu & sandal.
 
 KLASIFIKASI TINGKAT KERUSAKAN (SEVERITY TIER):
 - "kecil": Kerusakan ringan / sebagian di 1 titik (< 40% area), misal ujung sol mangap tipis, hak sedikit aus, atau kotor ringan.
@@ -148,12 +151,11 @@ Mohon diagnosis dan berikan rekomendasi menu servis resmi Soleman dalam format J
       contentsParts.push({ text: promptText });
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-4-hydrogen',
         contents: { parts: contentsParts },
         config: {
           systemInstruction,
           responseMimeType: 'application/json',
-          temperature: 0.2,
         },
       });
 
@@ -196,6 +198,7 @@ Mohon diagnosis dan berikan rekomendasi menu servis resmi Soleman dalam format J
         server: {
           middlewareMode: true,
           hmr: false,
+          allowedHosts: true,
         },
         appType: 'spa',
       });

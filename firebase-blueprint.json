@@ -30,6 +30,11 @@
           "description": "Kategori jenis sepatu",
           "maxLength": 100
         },
+        "shoeSize": {
+          "type": "string",
+          "description": "Ukuran sepatu / sandal untuk penggantian tapak",
+          "maxLength": 32
+        },
         "pairsCount": {
           "type": "number",
           "description": "Jumlah pasang sepatu yang diservis"
@@ -74,9 +79,19 @@
             "pengerjaan",
             "quality_check",
             "siap_antar",
-            "selesai"
+            "selesai",
+            "dibatalkan"
           ],
           "description": "Tahap progres pengerjaan dan pengantaran pesanan"
+        },
+        "cancellationReason": {
+          "type": "string",
+          "description": "Alasan pembatalan pesanan (misal: Stok Kosong)",
+          "maxLength": 300
+        },
+        "isOutOfStockCancelled": {
+          "type": "boolean",
+          "description": "Penanda pesanan dibatalkan karena stok bahan/tapak kosong"
         },
         "isAcceptedByAdmin": {
           "type": "boolean",
@@ -103,6 +118,32 @@
         "totalAmount",
         "status"
       ]
+    },
+    "ServiceStock": {
+      "title": "ServiceStock",
+      "description": "Status ketersediaan stok bahan/tapak layanan Soleman Cirebon.",
+      "type": "object",
+      "properties": {
+        "serviceId": {
+          "type": "string",
+          "description": "ID layanan dari katalog Soleman",
+          "maxLength": 100
+        },
+        "isOutOfStock": {
+          "type": "boolean",
+          "description": "Menandai apakah stok tapak/bahan sedang kosong total"
+        },
+        "note": {
+          "type": "string",
+          "description": "Catatan ukuran/stok yang kosong",
+          "maxLength": 300
+        },
+        "updatedAtMs": {
+          "type": "number",
+          "description": "Waktu pembaruan status stok"
+        }
+      },
+      "required": ["serviceId", "isOutOfStock"]
     }
   },
   "firestore": {
@@ -117,6 +158,12 @@
         "$ref": "#/entities/Order"
       },
       "description": "Koleksi cadangan sinkronisasi pesanan reparasi sepatu Soleman Cirebon."
+    },
+    "/stok_layanan/{serviceId}": {
+      "schema": {
+        "$ref": "#/entities/ServiceStock"
+      },
+      "description": "Status stok kosong per layanan/tapak yang tersinkronisasi real-time ke halaman pemesanan pelanggan."
     }
   }
 }

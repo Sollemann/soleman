@@ -437,7 +437,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {/* Direct Courier & Admin WhatsApp Contact */}
             <div className="pt-2 flex flex-col sm:flex-row gap-3">
               <a
-                href={`https://wa.me/62${(foundOrder.assignedCourierPhone || '08814519955').replace(/^0/, '')}?text=${encodeURIComponent(`Halo Kurir Soleman, saya ${foundOrder.customerName} ingin info penjemputan order #${foundOrder.id} di ${foundOrder.location.areaName}`)}`}
+                href={`https://wa.me/62${(foundOrder.assignedCourierPhone || '083152276387').replace(/^0/, '')}?text=${encodeURIComponent(`Halo Kurir Soleman, saya ${foundOrder.customerName} ingin info penjemputan order #${foundOrder.id} di ${foundOrder.location.areaName}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-md transition-all cursor-pointer"
