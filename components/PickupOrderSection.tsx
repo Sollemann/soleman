@@ -21,8 +21,6 @@ import {
   QrCode, 
   Bell,
   Check,
-  Navigation,
-  Loader2,
   ExternalLink
 } from 'lucide-react';
 import { 
@@ -32,9 +30,7 @@ import {
   STATUS_LABELS,
   isTapakOrSoleSizeRequired,
   calculateServicePrice,
-  getServiceTierDetail,
-  findClosestCirebonArea,
-  calculateDistanceToWorkshop
+  getServiceTierDetail
 } from '../data/solcreftData';
 import { 
   ServiceItem, 
@@ -170,19 +166,9 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     }
   }, [initialServices, initialShoeType, initialPairsCount, initialArea, initialSeverity, initialShoeSize]);
 
-  // Delivery State: Antar-Jemput Kurir Langsung + Otomatis Share-Loc via WhatsApp
+  // Delivery State: Antar-Jemput Kurir Langsung lewat Fitur Asli WhatsApp
   const [pickupType] = useState<'antar_jemput' | 'drop_off'>('antar_jemput');
-  const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Share-Loc Otomatis via WhatsApp');
-
-  // Auto GPS Share-Loc State (1-tap otomatis ambil lokasi sekarang & langsung buka WA)
-  const [autoGpsCoords, setAutoGpsCoords] = useState<{
-    lat: number;
-    lng: number;
-    accuracy: number;
-    capturedAt: number;
-  } | null>(null);
-  const [isCapturingGpsForWa, setIsCapturingGpsForWa] = useState(false);
-  const [autoWaStatusMsg, setAutoWaStatusMsg] = useState<string | null>(null);
+  const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Share-Loc Asli WhatsApp');
   const [lastSharedWaUrl, setLastSharedWaUrl] = useState<string | null>(null);
 
   // Active Menu Tab for Service Selection (Organized by Menu Category)
@@ -195,154 +181,10 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [validationError, setValidationError] = useState('');
 
-  // Fast high-accuracy GPS capture helper (resolves early at <=25m accuracy or max ~2.5s)
-  const captureCurrentPositionFast = (timeoutMs: number = 2500): Promise<{ lat: number; lng: number; accuracy: number } | null> => {
-    return new Promise((resolve) => {
-      if (typeof navigator === 'undefined' || !navigator.geolocation) {
-        resolve(null);
-        return;
-      }
-
-      let bestSample: { lat: number; lng: number; accuracy: number } | null = null;
-      let settled = false;
-      let watchId: number | null = null;
-
-      const finish = (sample: { lat: number; lng: number; accuracy: number } | null) => {
-        if (settled) return;
-        settled = true;
-        if (watchId !== null) {
-          try {
-            navigator.geolocation.clearWatch(watchId);
-          } catch {}
-        }
-        clearTimeout(timer);
-        if (sample) {
-          setAutoGpsCoords({ ...sample, capturedAt: Date.now() });
-        }
-        resolve(sample);
-      };
-
-      const timer = window.setTimeout(() => {
-        finish(bestSample);
-      }, timeoutMs);
-
-      try {
-        watchId = navigator.geolocation.watchPosition(
-          (pos) => {
-            const sample = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              accuracy: pos.coords.accuracy || 20,
-            };
-            if (!bestSample || sample.accuracy < bestSample.accuracy) {
-              bestSample = sample;
-            }
-            if (sample.accuracy <= 25) {
-              finish(bestSample);
-            }
-          },
-          () => {
-            finish(bestSample);
-          },
-          {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: timeoutMs + 1500,
-          }
-        );
-      } catch {
-        finish(null);
-      }
-    });
-  };
-
-  // Pre-warm GPS diam-diam di background HANYA jika izin lokasi sudah granted (tanpa pop-up paksa)
-  useEffect(() => {
-    let cancelled = false;
-    if (typeof navigator !== 'undefined' && 'permissions' in navigator) {
-      navigator.permissions
-        .query({ name: 'geolocation' as PermissionName })
-        .then((perm) => {
-          if (!cancelled && perm.state === 'granted') {
-            captureCurrentPositionFast(2500);
-          }
-        })
-        .catch(() => {});
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Buka URL WhatsApp dengan aman terhadap browser popup blocker
-  const navigatePreopenedWaWindow = (preopenedWin: Window | null, waUrl: string) => {
-    setLastSharedWaUrl(waUrl);
-    if (preopenedWin && !preopenedWin.closed) {
-      try {
-        preopenedWin.location.href = waUrl;
-        return;
-      } catch {}
-    }
-    const opened = window.open(waUrl, '_blank', 'noopener,noreferrer');
-    if (!opened) {
-      try {
-        window.location.assign(waUrl);
-      } catch {}
-    }
-  };
-
-  // 1-Tap tombol langsung ambil lokasi sekarang & buka WhatsApp dengan link lokasi siap kirim
-  const handleOneTapShareLocWa = async () => {
-    soundFx.playClick();
-    setAutoWaStatusMsg(null);
-
-    const buildDirectShareLocWaUrl = (coords: { lat: number; lng: number; accuracy: number } | null) => {
-      const custLabel = customerName.trim() || 'Pelanggan Soleman';
-      const patokanLine = customerAddress.trim() ? `\n🏠 Patokan: ${customerAddress.trim()}` : '';
-      if (coords) {
-        const closest = findClosestCirebonArea(coords.lat, coords.lng);
-        const distKm = calculateDistanceToWorkshop(coords.lat, coords.lng);
-        const mapsLink = `https://www.google.com/maps?q=${coords.lat},${coords.lng}`;
-        const ongkirNote = closest.deliveryFee === 0 ? 'GRATIS ONGKIR Kota Cirebon' : 'Kab. Cirebon (Ongkir Rp 15.000)';
-        const msg = `Halo Kurir Soleman Cirebon! 👋🛵\nSaya *${custLabel}* mau bagi lokasi jemput sepatu sekarang:\n\n📍 *Lokasi Saya Sekarang (Google Maps):*\n${mapsLink}\n\n🧭 Koordinat: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)} (±${Math.round(coords.accuracy)}m)\n📌 Perkiraan Area: ${closest.name} (~${distKm} KM dari Workshop • ${ongkirNote})${patokanLine}\n\nTinggal klik link lokasi di atas untuk navigasi ya Mas Kurir. Terima kasih! 🙏👟`;
-        return {
-          waUrl: `https://wa.me/${WORKSHOP_INFO.phone}?text=${encodeURIComponent(msg)}`,
-          statusText: `Lokasi sekarang terkunci (±${Math.round(coords.accuracy)}m, ~${distKm} KM) & langsung dibuka di WhatsApp!`,
-        };
-      }
-      const fallbackMsg = `Halo Kurir Soleman Cirebon! 👋🛵\nSaya *${custLabel}* mau pesan antar-jemput sepatu.\n\n📍 *Lokasi Jemput:* _(Saya kirim titik 📍 Lokasi bawaan WhatsApp langsung di chat ini)_${patokanLine}`;
-      return {
-        waUrl: `https://wa.me/${WORKSHOP_INFO.phone}?text=${encodeURIComponent(fallbackMsg)}`,
-        statusText: 'GPS tidak diizinkan browser — WhatsApp dibuka agar Anda bisa kirim titik 📍 Lokasi langsung di chat.',
-      };
-    };
-
-    // Jika GPS fresh (< 45 detik) sudah tersimpan, langsung buka WhatsApp seketika (sinkron!)
-    if (autoGpsCoords && Date.now() - autoGpsCoords.capturedAt < 45000) {
-      const { waUrl, statusText } = buildDirectShareLocWaUrl(autoGpsCoords);
-      setLastSharedWaUrl(waUrl);
-      setAutoWaStatusMsg(statusText);
-      const win = window.open(waUrl, '_blank', 'noopener,noreferrer');
-      if (!win) {
-        try {
-          window.location.assign(waUrl);
-        } catch {}
-      }
-      return;
-    }
-
-    // Pre-open tab synchronously sebelum async geolocation agar tidak diblokir popup blocker
-    const preopenedWin = window.open('about:blank', '_blank');
-    setIsCapturingGpsForWa(true);
-    try {
-      const coords = await captureCurrentPositionFast(2500);
-      const { waUrl, statusText } = buildDirectShareLocWaUrl(coords);
-      setAutoWaStatusMsg(statusText);
-      navigatePreopenedWaWindow(preopenedWin, waUrl);
-    } finally {
-      setIsCapturingGpsForWa(false);
-    }
-  };
+  // Link langsung ke WhatsApp resmi Soleman untuk kirim Share-Loc asli bawaan WhatsApp
+  const directNativeWaShareLocUrl = `https://wa.me/${WORKSHOP_INFO.phone}?text=${encodeURIComponent(
+    `Halo Kurir Soleman Cirebon! 👋🛵\nSaya *${customerName.trim() || 'Pelanggan Soleman'}* ingin kirim titik *📍 Lokasi Asli WhatsApp* untuk penjemputan sepatu saya.${customerAddress.trim() ? `\n🏠 Patokan: ${customerAddress.trim()}` : ''}`
+  )}`;
 
   // Synchronize shoesList when pairsCount changes
   useEffect(() => {
@@ -524,16 +366,12 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
   const totalServicesPrice = shoeDetailsWithPrices.reduce((sum, s) => sum + s.price, 0);
 
-  const detectedAreaFromGps = autoGpsCoords
-    ? findClosestCirebonArea(autoGpsCoords.lat, autoGpsCoords.lng)
-    : null;
-
-  // Aturan Ongkir: Kota Cirebon Gratis Ongkir (Rp 0), Kabupaten Rp 15.000 — otomatis terdeteksi dari lokasi GPS
-  const deliveryFee = pickupType === 'drop_off' ? 0 : detectedAreaFromGps ? detectedAreaFromGps.deliveryFee : 0;
+  // Aturan Ongkir: Kota Cirebon Gratis Ongkir (Rp 0), Kabupaten Rp 15.000 — dikonfirmasi langsung via Share-Loc asli WhatsApp
+  const deliveryFee = pickupType === 'drop_off' ? 0 : 0;
   const grandTotal = totalServicesPrice + deliveryFee;
 
-  // Handle Order Submit (1-tap otomatis ambil GPS lokasi sekarang & sisipkan ke pesan WA + Firestore)
-  const handleCreateOrder = async (sendToWhatsApp: boolean = false) => {
+  // Handle Order Submit (Langsung buka WhatsApp agar pelanggan pakai fitur Share-Loc asli WA)
+  const handleCreateOrder = (sendToWhatsApp: boolean = false) => {
     setValidationError('');
 
     if (!customerName.trim()) {
@@ -572,29 +410,6 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       }
     }
 
-    const hasFreshGps = Boolean(autoGpsCoords && Date.now() - autoGpsCoords.capturedAt < 60000);
-    // Pre-open tab synchronously bila butuh ambil GPS dulu sebelum buka WA
-    const preopenedWaWin = sendToWhatsApp && !hasFreshGps ? window.open('about:blank', '_blank') : null;
-
-    let gpsResult: { lat: number; lng: number; accuracy: number } | null = hasFreshGps && autoGpsCoords
-      ? { lat: autoGpsCoords.lat, lng: autoGpsCoords.lng, accuracy: autoGpsCoords.accuracy }
-      : null;
-
-    if (!gpsResult) {
-      setIsCapturingGpsForWa(true);
-      try {
-        gpsResult = await captureCurrentPositionFast(2400);
-      } finally {
-        setIsCapturingGpsForWa(false);
-      }
-    }
-
-    const closestArea = gpsResult ? findClosestCirebonArea(gpsResult.lat, gpsResult.lng) : null;
-    const distanceFromWorkshopKm = gpsResult ? calculateDistanceToWorkshop(gpsResult.lat, gpsResult.lng) : undefined;
-    const effectiveDeliveryFee = pickupType === 'drop_off' ? 0 : closestArea ? closestArea.deliveryFee : deliveryFee;
-    const effectiveGrandTotal = totalServicesPrice + effectiveDeliveryFee;
-    const mapsPinUrl = gpsResult ? `https://www.google.com/maps?q=${gpsResult.lat},${gpsResult.lng}` : undefined;
-
     const allPhotos = shoeDetailsWithPrices
       .map(s => s.photoUrl)
       .filter((url): url is string => Boolean(url));
@@ -607,9 +422,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       ? shoesList[0].shoeBrand 
       : `${shoesList[0].shoeBrand} (+${pairsCount - 1} pasang)`;
 
-    const cleanArea = closestArea?.name || (areaName.trim() || 'Share-Loc via WhatsApp');
-    const effectiveAreaType = closestArea?.type || 'Kota';
-    const effectiveDistanceZone = effectiveAreaType === 'Kota' ? 'dekat_kota' : 'jauh_kabupaten';
+    const cleanArea = areaName.trim() || 'Share-Loc Asli WhatsApp';
     const cleanAddressNote = customerAddress.trim();
 
     const newOrder: Order = {
@@ -630,28 +443,24 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       photos: allPhotos,
       pickupType,
       preferredTimeSlot: 'siang',
-      distanceZone: effectiveDistanceZone,
+      distanceZone: 'dekat_kota',
       logisticsPartner: 'kurir_soleman',
       customerConfirmedMaterialPhoto: true,
       location: {
         areaName: cleanArea,
-        areaType: effectiveAreaType,
-        distanceZone: effectiveDistanceZone,
+        areaType: 'Kota',
+        distanceZone: 'dekat_kota',
         logisticsPartner: 'kurir_soleman',
         shareLocViaWhatsApp: true,
-        isLiveShared: Boolean(gpsResult),
-        lat: gpsResult?.lat,
-        lng: gpsResult?.lng,
-        accuracy: gpsResult?.accuracy,
-        mapsUrl: mapsPinUrl,
-        fullAddress: cleanAddressNote || (gpsResult ? `Titik GPS Otomatis (${cleanArea})` : 'Share-Loc dikirim via WhatsApp (0831-5227-6387)'),
-        landmark: cleanAddressNote || (gpsResult ? `Lokasi Sekarang ~${distanceFromWorkshopKm} KM dari Workshop` : 'Kirim Share-Loc WA bawaan ke Kurir Soleman'),
+        isLiveShared: false,
+        fullAddress: cleanAddressNote || 'Share-Loc asli langsung via WhatsApp (0831-5227-6387)',
+        landmark: cleanAddressNote || 'Kirim titik Lokasi bawaan WhatsApp langsung ke Kurir',
       },
       paymentMethod,
       paymentStatus: paymentMethod === 'cod' ? 'cod_pending' : 'menunggu_pembayaran',
       totalServicesPrice,
-      deliveryFee: effectiveDeliveryFee,
-      totalAmount: effectiveGrandTotal,
+      deliveryFee,
+      totalAmount: grandTotal,
       status: 'menunggu_jemput',
       isAcceptedByAdmin: false,
       createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
@@ -664,7 +473,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           status: 'menunggu_jemput',
           label: 'Pesanan Diterima di Sistem',
           timestamp: 'Baru saja',
-          description: `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()}. ${gpsResult ? `Titik GPS (${gpsResult.lat.toFixed(5)}, ${gpsResult.lng.toFixed(5)}) tersinkron otomatis.` : 'Lokasi jemput dikirim via Share-Loc WhatsApp ke Kurir.'}`
+          description: `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()}. Pelanggan mengirim Share-Loc asli langsung di chat WhatsApp Kurir.`
         }
       ]
     };
@@ -675,10 +484,13 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
     if (sendToWhatsApp) {
       const waUrl = buildNewOrderWhatsAppUrl(newOrder);
-      if (gpsResult) {
-        setAutoWaStatusMsg(`Order #${newOrder.id} & lokasi sekarang (±${Math.round(gpsResult.accuracy)}m) otomatis disisipkan ke WhatsApp!`);
+      setLastSharedWaUrl(waUrl);
+      const opened = window.open(waUrl, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        try {
+          window.location.assign(waUrl);
+        } catch {}
       }
-      navigatePreopenedWaWindow(preopenedWaWin, waUrl);
     }
   };
 
@@ -816,56 +628,16 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                   {idx === 0 && createdOrder && (
                     <div className="space-y-2.5 pt-2 border-t border-slate-800">
                       <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="button"
-                          disabled={isCapturingGpsForWa}
-                          onClick={async () => {
-                            if (ord.location?.lat && ord.location?.lng) {
-                              const waUrl = buildNewOrderWhatsAppUrl(ord);
-                              setLastSharedWaUrl(waUrl);
-                              window.open(waUrl, '_blank', 'noopener,noreferrer');
-                              return;
-                            }
-                            const preWin = window.open('about:blank', '_blank');
-                            setIsCapturingGpsForWa(true);
-                            try {
-                              const gps = await captureCurrentPositionFast(2400);
-                              const closest = gps ? findClosestCirebonArea(gps.lat, gps.lng) : null;
-                              const enrichedOrder: Order = gps
-                                ? {
-                                    ...ord,
-                                    location: {
-                                      ...ord.location,
-                                      areaName: closest?.name || ord.location.areaName,
-                                      areaType: closest?.type || ord.location.areaType,
-                                      isLiveShared: true,
-                                      lat: gps.lat,
-                                      lng: gps.lng,
-                                      accuracy: gps.accuracy,
-                                      mapsUrl: `https://www.google.com/maps?q=${gps.lat},${gps.lng}`,
-                                    },
-                                  }
-                                : ord;
-                              if (gps) setCreatedOrder(enrichedOrder);
-                              const waUrl = buildNewOrderWhatsAppUrl(enrichedOrder);
-                              navigatePreopenedWaWindow(preWin, waUrl);
-                            } finally {
-                              setIsCapturingGpsForWa(false);
-                            }
-                          }}
-                          className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 disabled:opacity-70 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
+                        <a
+                          href={buildNewOrderWhatsAppUrl(ord)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => soundFx.playClick()}
+                          className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
                         >
-                          {isCapturingGpsForWa ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Navigation className="w-4 h-4 stroke-[2.5]" />
-                          )}
-                          <span>
-                            {isCapturingGpsForWa
-                              ? 'Mengunci Lokasi Sekarang...'
-                              : 'Kirim Order & Lokasi Sekarang ke WhatsApp (0831-5227-6387)'}
-                          </span>
-                        </button>
+                          <MapPin className="w-4 h-4 stroke-[2.5]" />
+                          <span>Buka WhatsApp & Bagi Lokasi Asli (0831-5227-6387)</span>
+                        </a>
 
                         <button
                           type="button"
@@ -876,17 +648,9 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                         </button>
                       </div>
 
-                      {lastSharedWaUrl && (
-                        <a
-                          href={lastSharedWaUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 hover:text-emerald-200 underline"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>WhatsApp belum terbuka otomatis? Klik langsung di sini</span>
-                        </a>
-                      )}
+                      <p className="text-[11px] text-emerald-300/90 font-medium">
+                        Di dalam chat WhatsApp, cukup tekan ikon <strong>📎 / (+) ➔ 📍 Lokasi ➔ Kirim Lokasi Anda Saat Ini</strong>.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1232,75 +996,60 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           </div>
         </div>
 
-        {/* Step 3: Bagikan Lokasi Sekarang Otomatis ke WhatsApp (Tinggal Pencet) */}
+        {/* Step 3: Langsung ke Fitur Asli WhatsApp untuk Bagikan Lokasi */}
         <div className="space-y-3 pt-2 border-t border-slate-800">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-cyan-400">
               <span className="w-5 h-5 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center text-[10px]">3</span>
-              <span>Bagikan Lokasi Sekarang via WhatsApp</span>
+              <span>Bagi Lokasi Langsung di WhatsApp</span>
             </div>
-            {autoGpsCoords && (
-              <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-400/40 px-2.5 py-0.5 rounded-full">
-                📍 Lokasi Siap (±{Math.round(autoGpsCoords.accuracy)}m)
-              </span>
-            )}
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-950 border border-emerald-500/35 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-start gap-3">
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0">
-                  <Navigation className="w-4 h-4" />
+                  <MapPin className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-xs font-black text-white block">
-                    Otomatis Bagikan Lokasi Sekarang di WA (Tinggal Pencet)
+                    Langsung Pakai Fitur Asli Share-Loc WhatsApp
                   </span>
                   <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
-                    Sekali tekan, sistem langsung mengambil titik GPS Anda saat ini & membukanya di chat <strong>WhatsApp Kurir (0831-5227-6387)</strong> — tinggal pencet <strong>Kirim</strong>!
+                    Tanpa GPS browser atau pilih area di web — sekali klik langsung buka chat <strong>WhatsApp Kurir (0831-5227-6387)</strong>, lalu tekan ikon <strong>📎 / (+) ➔ 📍 Lokasi ➔ Kirim Lokasi Anda Saat Ini</strong>.
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                disabled={isCapturingGpsForWa}
-                onClick={handleOneTapShareLocWa}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 disabled:opacity-70 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all shrink-0 cursor-pointer"
+              <a
+                href={directNativeWaShareLocUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => soundFx.playClick()}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 transition-all shrink-0 cursor-pointer"
               >
-                {isCapturingGpsForWa ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Mengambil Lokasi...</span>
-                  </>
-                ) : (
-                  <>
-                    <Navigation className="w-4 h-4 stroke-[2.5]" />
-                    <span>Kirim Lokasi Sekarang ke WA</span>
-                  </>
-                )}
-              </button>
+                <MapPin className="w-4 h-4 stroke-[2.5]" />
+                <span>Buka WA & Bagi Lokasi Sekarang</span>
+              </a>
             </div>
 
-            {autoWaStatusMsg && (
-              <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-400/40 flex flex-wrap items-center justify-between gap-2 text-[11px] text-emerald-200 font-semibold">
-                <span>✅ {autoWaStatusMsg}</span>
-                {lastSharedWaUrl && (
-                  <a
-                    href={lastSharedWaUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 underline text-emerald-300 hover:text-white font-bold"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    <span>Buka WA Sekarang</span>
-                  </a>
-                )}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200">
+                <span className="font-black text-emerald-400 block">1. Buka Chat WA Kurir</span>
+                <span className="text-slate-400">Klik tombol hijau untuk langsung masuk ke chat WA resmi.</span>
               </div>
-            )}
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200">
+                <span className="font-black text-emerald-400 block">2. Tekan 📎 / (+) ➔ 📍 Lokasi</span>
+                <span className="text-slate-400">Gunakan tombol Lokasi bawaan asli aplikasi WhatsApp.</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200">
+                <span className="font-black text-emerald-400 block">3. Kirim Lokasi Saat Ini</span>
+                <span className="text-slate-400">Kurir langsung meluncur tepat ke titik rumah Anda.</span>
+              </div>
+            </div>
 
             <div className="p-2.5 rounded-xl bg-cyan-950/35 border border-cyan-500/30 flex flex-wrap items-center justify-between gap-2 text-[11px]">
               <span className="text-cyan-300 font-semibold">
-                🛵 Gratis Ongkir wilayah Kota Cirebon • Kab. Cirebon Rp 15.000 (otomatis terdeteksi dari titik GPS Anda)
+                🛵 Gratis Ongkir wilayah Kota Cirebon • Kab. Cirebon Rp 15.000 (konfirmasi langsung dari Share-Loc WA Anda)
               </span>
             </div>
 
@@ -1394,33 +1143,36 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="button"
-              disabled={isCapturingGpsForWa}
               onClick={() => handleCreateOrder(true)}
-              className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 disabled:opacity-70 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
+              className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
             >
-              {isCapturingGpsForWa ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Mengambil Lokasi & Membuka WhatsApp...</span>
-                </>
-              ) : (
-                <>
-                  <MessageSquare className="w-4 h-4 stroke-[2.5]" />
-                  <span>Pesan & Otomatis Share-Loc Sekarang ke WA</span>
-                </>
-              )}
+              <MessageSquare className="w-4 h-4 stroke-[2.5]" />
+              <span>Pesan & Buka WhatsApp untuk Bagi Lokasi</span>
             </button>
 
             <button
               type="button"
-              disabled={isCapturingGpsForWa}
               onClick={() => handleCreateOrder(false)}
-              className="py-3.5 px-6 rounded-xl bg-slate-800 hover:bg-slate-750 disabled:opacity-70 text-white font-bold text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all cursor-pointer"
+              className="py-3.5 px-6 rounded-xl bg-slate-800 hover:bg-slate-750 text-white font-bold text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all cursor-pointer"
             >
               <Truck className="w-4 h-4 text-cyan-400" />
               <span>Simpan Pesanan Saja</span>
             </button>
           </div>
+
+          {lastSharedWaUrl && (
+            <div className="text-center">
+              <a
+                href={lastSharedWaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 hover:text-emerald-200 underline"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>WhatsApp belum terbuka otomatis? Klik di sini untuk langsung ke WA</span>
+              </a>
+            </div>
+          )}
         </div>
 
       </div>

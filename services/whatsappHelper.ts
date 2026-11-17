@@ -440,18 +440,15 @@ ${serviceList}`;
       : `🛵 *Logistik Pengantaran:* Kurir Internal Soleman (Area Dekat / Kota Cirebon)`;
 
   const mapsPinUrl = order.location.mapsUrl || (order.location.lat && order.location.lng ? `https://www.google.com/maps?q=${order.location.lat},${order.location.lng}` : '');
-  const gpsText = order.location.lat && order.location.lng
-    ? `\n🧭 *Koordinat GPS Akurat:* ${order.location.lat.toFixed(6)}, ${order.location.lng.toFixed(6)}${order.location.accuracy ? ` (±${Math.round(order.location.accuracy)}m)` : ''}`
-    : '';
   const mapsShareLine = mapsPinUrl
     ? `\n📍 *Lokasi Saya Sekarang (Google Maps):*\n${mapsPinUrl}`
-    : `\n📍 *Lokasi Sekarang:* _(Saya kirim titik 📍 Lokasi bawaan WhatsApp langsung di chat ini)_`;
+    : `\n📍 *Lokasi Asli WhatsApp:* _(Saya bagikan langsung lewat fitur 📎 -> 📍 Lokasi bawaan WhatsApp di chat ini)_`;
 
   const locationText = order.pickupType === 'drop_off'
     ? `🏢 *Metode:* Drop-off Langsung ke Workshop Soleman (Jl. Sukalila Selatan Cirebon)`
     : `${logisticsLabel}
-🏠 *Patokan / Alamat:* ${order.location.fullAddress || order.location.landmark || 'Share-Loc Otomatis via WhatsApp'}
-⏰ *Jadwal Jemput:* Sesi ${order.preferredTimeSlot.toUpperCase()}${gpsText}${mapsShareLine}`;
+🏠 *Patokan / Alamat:* ${order.location.fullAddress || order.location.landmark || 'Share-Loc Asli lewat WhatsApp'}
+⏰ *Jadwal Jemput:* Sesi ${order.preferredTimeSlot.toUpperCase()}${mapsShareLine}`;
 
   const photoNote = (order.photos && order.photos.length > 0) || order.photoUrl
     ? `📸 *FOTO SEPATU RUSAK:* Sudah terunggah di sistem & saya siap kirim foto tambahan ke chat ini agar admin mudah cek kondisinya.${photoConfirmText}`
@@ -460,7 +457,7 @@ ${serviceList}`;
   const ongkirText = order.pickupType === 'drop_off'
     ? 'Rp 0 (Drop-off Langsung ke Workshop)'
     : order.deliveryFee === 0
-    ? 'Rp 0 (GRATIS ONGKIR Kota Cirebon)'
+    ? 'Rp 0 (Gratis Ongkir Kota Cirebon / Ongkir Kab. Rp 15.000 sesuai Share-Loc WA)'
     : 'Rp 15.000 (Kabupaten Cirebon)';
 
   const courierToken = encodeOrderForCourierLink(order);
