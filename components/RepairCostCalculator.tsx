@@ -17,7 +17,6 @@ import {
 import { ShoeType, ServiceItem, DamageSeverity, ServiceStockItem } from '../types';
 import {
   SERVICES_CATALOG,
-  CIREBON_AREAS,
   DAMAGE_SEVERITIES,
   SHOE_SIZES,
   isTapakOrSoleSizeRequired,
@@ -47,7 +46,6 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
   const [severity, setSeverity] = useState<DamageSeverity>('normal');
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(['jahit-benang-tersembunyi']);
   const [pairsCount, setPairsCount] = useState<number>(1);
-  const [selectedAreaName, setSelectedAreaName] = useState<string>('Kesambi (Cipto, Sudarsono, Sunyaragi, Drajat)');
 
   const shoeTypeOptions: { type: ShoeType; label: string; icon: string }[] = [
     { type: 'Sneakers', label: 'Sneakers / Canvas', icon: '👟' },
@@ -84,10 +82,6 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
     [selectedServices]
   );
 
-  const selectedAreaObj = useMemo(() => {
-    return CIREBON_AREAS.find(a => a.name === selectedAreaName) || CIREBON_AREAS[0];
-  }, [selectedAreaName]);
-
   // Calculate price for each severity level so user can compare Ringan vs Sedang vs Berat side-by-side
   const tierTotals = useMemo(() => {
     const computeForSeverity = (sev: DamageSeverity) => {
@@ -100,25 +94,13 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
     };
   }, [selectedServices]);
 
-  // Detailed Calculation
+  // Detailed Calculation (Ongkir otomatis mengikuti Bagikan Lokasi di Form Order; Kota Cirebon Gratis)
   const calculation = useMemo(() => {
     const baseServicePrice = tierTotals[severity];
     const subtotalServices = baseServicePrice * pairsCount;
-
-    let deliveryFee = 0;
-    let isFreeDelivery = false;
-    let deliveryNote = '';
-
-    if (selectedAreaObj.type === 'Kota') {
-      deliveryFee = 0;
-      isFreeDelivery = true;
-      deliveryNote = 'Gratis Ongkir se-Kota Cirebon (Dijemput Kurir Soleman)';
-    } else {
-      deliveryFee = 15000;
-      isFreeDelivery = false;
-      deliveryNote = 'Ongkir Kurir Kab. Cirebon (Rp 15.000)';
-    }
-
+    const deliveryFee = 0;
+    const isFreeDelivery = true;
+    const deliveryNote = 'Gratis Ongkir se-Kota Cirebon (Kabupaten Rp 15.000) — otomatis terdeteksi saat Bagikan Lokasi';
     const totalEstimate = subtotalServices + deliveryFee;
 
     let maxDays = severity === 'hard' ? 3 : 2;
@@ -143,7 +125,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
       maxDays,
       warrantyDays
     };
-  }, [selectedServices, severity, tierTotals, pairsCount, selectedAreaObj]);
+  }, [selectedServices, severity, tierTotals, pairsCount]);
 
   const handleApply = () => {
     soundFx.playSuccess();
@@ -151,7 +133,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
       services: selectedServices,
       shoeType,
       pairsCount,
-      areaName: selectedAreaName,
+      areaName: '',
       severity,
       shoeSize: needsShoeSize ? shoeSize : undefined,
     });
@@ -164,7 +146,6 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
     setPairsCount(1);
     setShoeType('Sneakers');
     setShoeSize('40');
-    setSelectedAreaName(CIREBON_AREAS[0].name);
   };
 
   const activeSeverityMeta = DAMAGE_SEVERITIES.find(s => s.id === severity) || DAMAGE_SEVERITIES[1];
@@ -394,13 +375,11 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
             )}
           </div>
 
-          {/* Step 4: Jumlah Pasang & Lokasi Kecamatan Cirebon */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            
-            {/* Jumlah Pasang */}
+          {/* Step 4: Jumlah Pasang */}
+          <div className="pt-2">
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-sky-400">
-                4. Jumlah Sepatu:
+                4. Jumlah Sepatu / Sandal:
               </label>
               <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
@@ -422,28 +401,6 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
                 ))}
               </div>
             </div>
-
-            {/* Wilayah Kecamatan */}
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-wider text-cyan-400">
-                5. Wilayah Anda di Cirebon:
-              </label>
-              <select
-                value={selectedAreaName}
-                onChange={(e) => {
-                  soundFx.playClick();
-                  setSelectedAreaName(e.target.value);
-                }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
-              >
-                {CIREBON_AREAS.map(area => (
-                  <option key={area.name} value={area.name}>
-                    {area.type === 'Kota' ? '🏙️' : '📍'} {area.name} ({area.type})
-                  </option>
-                ))}
-              </select>
-            </div>
-
           </div>
 
           <div className="pt-2 flex items-center justify-between text-xs text-slate-400">
@@ -474,7 +431,7 @@ export const RepairCostCalculator: React.FC<RepairCostCalculatorProps> = ({
             </div>
             <h3 className="text-xl font-bold text-white">Ringkasan Kerusakan & Biaya</h3>
             <p className="text-xs text-slate-400">
-              Untuk {pairsCount} pasang {shoeType}{needsShoeSize ? ` (Ukuran EU ${shoeSize})` : ''} • Wilayah {selectedAreaObj.type} Cirebon
+              Untuk {pairsCount} pasang {shoeType}{needsShoeSize ? ` (Ukuran EU ${shoeSize})` : ''} • Ongkir otomatis via Bagikan Lokasi
             </p>
           </div>
 

@@ -20,6 +20,7 @@ import {
   Sparkles, 
   QrCode, 
   Crosshair,
+  ClipboardPaste,
   Check
 } from 'lucide-react';
 import { 
@@ -162,13 +163,27 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     }
   }, [initialServices, initialShoeType, initialPairsCount, initialArea, initialSeverity, initialShoeSize]);
 
-  // Delivery State: Antar-Jemput Kurir Langsung + Bagi Lokasi Akurat
+  // Delivery State: Antar-Jemput Kurir Langsung + Bagi Lokasi Akurat Otomatis
   const [pickupType] = useState<'antar_jemput' | 'drop_off'>('antar_jemput');
-  const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Kesambi');
+  const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Kota Cirebon (Otomatis via Lokasi)');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [shareLocInput, setShareLocInput] = useState('');
   const [isLocatingGps, setIsLocatingGps] = useState(false);
   const [gpsStatusMsg, setGpsStatusMsg] = useState('');
+  const shareInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Jika izin GPS sudah pernah diberikan sebelumnya, langsung kunci titik lokasi otomatis
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) return;
+    navigator.permissions
+      .query({ name: 'geolocation' as PermissionName })
+      .then((res) => {
+        if (res.state === 'granted' && !gpsCoords && !shareLocInput) {
+          handleDetectGps();
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Active Menu Tab for Service Selection (Organized by Menu Category)
   const [activeFormMenuTab, setActiveFormMenuTab] = useState<'jahit' | 'sol' | 'treatment' | 'rekonstruksi'>('jahit');
@@ -339,7 +354,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   // Deteksi GPS Koordinat 1-Klik Otomatis & Pemilihan Wilayah Cirebon Terdekat
   const handleDetectGps = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setGpsStatusMsg('Perangkat belum mendukung GPS otomatis. Silakan tempel link Google Maps di kolom bawah.');
+      setGpsStatusMsg('Perangkat belum mendukung GPS otomatis. Salin link Google Maps lalu pencet Tempel Otomatis.');
       return;
     }
     setIsLocatingGps(true);
@@ -360,7 +375,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       },
       () => {
         setIsLocatingGps(false);
-        setGpsStatusMsg('Izin GPS belum diizinkan. Anda bisa pilih Kecamatan dan tempel link Google Maps di kolom bawah.');
+        setGpsStatusMsg('Izin GPS belum aktif. Salin link Share-Loc / Google Maps rumah Anda lalu pencet tombol Tempel Otomatis!');
       },
       { enableHighAccuracy: true, timeout: 9000 }
     );
@@ -374,10 +389,35 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       const closest = findClosestCirebonArea(parsed.lat, parsed.lng);
       setAreaName(closest.name);
       setGpsCoords({ lat: parsed.lat, lng: parsed.lng });
-      setGpsStatusMsg(`✓ Titik Maps Terdeteksi: ${closest.name} • ±${dist} KM dari Workshop`);
+      setGpsStatusMsg(`✓ Titik Maps Terdeteksi Otomatis: ${closest.name} (${closest.type === 'Kota' ? 'GRATIS ONGKIR Kota' : 'Ongkir 15k Kab.'}) • ±${dist} KM`);
     } else if (parsed.cleanUrl) {
-      setGpsStatusMsg('✓ Link Google Maps berhasil terbaca dan akan dikirim akurat ke Kurir.');
+      setGpsCoords(null);
+      setGpsStatusMsg('✓ Link Google Maps berhasil ditempel otomatis dan siap dikirim akurat ke Kurir!');
+    } else if (!val.trim()) {
+      setGpsCoords(null);
+      setGpsStatusMsg('');
     }
+  };
+
+  const handleOneClickPasteLocation = async () => {
+    soundFx.playClick();
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const clipText = await navigator.clipboard.readText();
+        if (clipText && clipText.trim()) {
+          handleShareLocInputChange(clipText.trim());
+          soundFx.playSuccess();
+          return;
+        }
+        setGpsStatusMsg('Clipboard masih kosong. Salin link Share-Loc / Google Maps dulu, lalu pencet Tempel Otomatis.');
+        shareInputRef.current?.focus();
+        return;
+      }
+    } catch {
+      // Fallback bila browser membatasi akses baca clipboard otomatis
+    }
+    setGpsStatusMsg('Tekan & tahan kotak link lalu pilih Tempel/Paste — titik lokasi otomatis terbaca.');
+    shareInputRef.current?.focus();
   };
 
   // Calculate pricing
@@ -407,6 +447,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   // Cek apakah wilayah termasuk Wilayah Kota Cirebon (Gratis Ongkir Khusus Kota)
   const isAreaInKotaCirebon = (name: string): boolean => {
     const lower = name.toLowerCase();
+    if (lower.includes('kota cirebon')) return true;
     const isKecamatanKota = KOTA_CIREBON_KECAMATAN.some(k => lower.includes(k.toLowerCase()));
     const matched = CIREBON_AREAS.find(a => a.name.toLowerCase() === lower);
     return isKecamatanKota || matched?.type === 'Kota';
@@ -473,7 +514,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       ? shoesList[0].shoeBrand 
       : `${shoesList[0].shoeBrand} (+${pairsCount - 1} pasang)`;
 
-    const cleanArea = areaName.trim() || 'Kesambi';
+    const cleanArea = areaName.trim() || 'Kota Cirebon (Otomatis via Lokasi)';
     const parsedShareInput = parseShareLocInput(shareLocInput);
     const finalLat = gpsCoords?.lat ?? parsedShareInput.lat;
     const finalLng = gpsCoords?.lng ?? parsedShareInput.lng;
@@ -969,12 +1010,12 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
           </div>
         </div>
 
-        {/* Step 3: Delivery & Area */}
+        {/* Step 3: Delivery & Automatic Share Location */}
         <div className="space-y-3 pt-2 border-t border-slate-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-cyan-400">
               <span className="w-5 h-5 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center text-[10px]">3</span>
-              <span>Metode Pengambilan & Wilayah</span>
+              <span>Bagikan Lokasi Antar-Jemput (Otomatis)</span>
             </div>
           </div>
 
@@ -986,7 +1027,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
               </div>
               <div>
                 <span className="text-xs font-bold text-white block">Layanan Antar-Jemput Kurir Langsung ke Rumah</span>
-                <p className="text-[11px] text-slate-400">Kurir Soleman menjemput dan mengantar sepatu langsung ke alamat Anda.</p>
+                <p className="text-[11px] text-slate-400">Wilayah & ongkir otomatis terbaca dari titik Bagikan Lokasi / link Maps Anda.</p>
               </div>
             </div>
             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border shrink-0 ${
@@ -998,18 +1039,18 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             </span>
           </div>
 
-          {/* Area & Accurate Location Sharing for Courier */}
+          {/* Automatic Share Location & 1-Click Paste for Courier */}
           <div className="space-y-3 bg-slate-950 p-4 rounded-2xl border border-cyan-500/25">
               {/* Prominent Share Location CTA for Courier */}
-              <div className="p-3 rounded-xl bg-gradient-to-r from-cyan-950/60 to-sky-950/50 border border-cyan-400/40 space-y-2.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-cyan-950/60 to-sky-950/50 border border-cyan-400/40 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div>
                     <span className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Bagikan Lokasi Akurat agar Kurir Langsung Tepat ke Rumah</span>
+                      <span>Bagikan Lokasi Akurat Sekali Pencet (Tanpa Pilih Kecamatan)</span>
                     </span>
                     <p className="text-[11px] text-slate-300 mt-0.5">
-                      Klik tombol di samping untuk mengunci titik GPS rumah Anda, atau tempel link Google Maps.
+                      Klik tombol Bagikan Lokasi GPS atau pencet Tempel Otomatis untuk link Share-Loc / Google Maps.
                     </p>
                   </div>
                   <button
@@ -1019,7 +1060,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                     className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer shrink-0"
                   >
                     <Crosshair className="w-4 h-4 stroke-[2.5]" />
-                    <span>{isLocatingGps ? 'Mengunci GPS...' : gpsCoords ? '📍 Perbarui Titik GPS Saya' : '📍 Bagikan Lokasi GPS Saya'}</span>
+                    <span>{isLocatingGps ? 'Mengunci GPS...' : gpsCoords ? '📍 Perbarui Lokasi GPS' : '📍 Bagikan Lokasi GPS'}</span>
                   </button>
                 </div>
 
@@ -1041,62 +1082,59 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                 )}
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                    Atau Tempel Link Share-Loc / Google Maps (Opsional):
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
+                    Tempel Link Share-Loc / Google Maps Rumah Anda:
                   </label>
-                  <input
-                    type="text"
-                    value={shareLocInput}
-                    onChange={(e) => handleShareLocInputChange(e.target.value)}
-                    placeholder="Tempel link Maps rumah (contoh: https://maps.app.goo.gl/... atau -6.715, 108.552)"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none font-mono placeholder:font-sans placeholder:text-slate-600"
-                  />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      ref={shareInputRef}
+                      type="text"
+                      value={shareLocInput}
+                      onChange={(e) => handleShareLocInputChange(e.target.value)}
+                      onPaste={(e) => {
+                        const pasted = e.clipboardData?.getData('text');
+                        if (pasted) {
+                          e.preventDefault();
+                          handleShareLocInputChange(pasted.trim());
+                          soundFx.playSuccess();
+                        }
+                      }}
+                      placeholder="Tempel link Maps (https://maps.app.goo.gl/... atau koordinat)"
+                      className="flex-1 px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none font-mono placeholder:font-sans placeholder:text-slate-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleOneClickPasteLocation}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all cursor-pointer shrink-0"
+                    >
+                      <ClipboardPaste className="w-4 h-4 stroke-[2.5]" />
+                      <span>Tempel Otomatis</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Dynamic Ongkir Status Banner */}
-              <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-semibold ${
+              {/* Dynamic Auto-Detected Area & Ongkir Banner */}
+              <div className={`p-2.5 rounded-xl border flex flex-wrap items-center justify-between gap-2 text-xs font-semibold ${
                 isKota 
                   ? 'bg-cyan-950/40 border-cyan-400/50 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.15)]'
                   : 'bg-slate-900 border-slate-800 text-slate-300'
               }`}>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0" />
                   <span>
-                    {isKota 
-                      ? '🎉 Khusus Wilayah Kota Cirebon: GRATIS ONGKIR!' 
-                      : '🛵 Wilayah Kabupaten Cirebon: Ongkir Rp 15.000 (15k)'}
+                    {gpsCoords
+                      ? `📍 Terdeteksi Otomatis: ${areaName} • ${isKota ? 'GRATIS ONGKIR Kota Cirebon' : 'Ongkir Rp 15.000 (Kab. Cirebon)'}`
+                      : parseShareLocInput(shareLocInput).cleanUrl
+                      ? '📍 Link Maps Terpasang Otomatis • Siap Dijemput Kurir'
+                      : isKota
+                      ? '🎉 Wilayah Kota Cirebon GRATIS ONGKIR (Otomatis via Bagikan Lokasi)'
+                      : '🛵 Wilayah Kabupaten Cirebon Ongkir Rp 15.000'}
                   </span>
                 </div>
                 <span className="font-mono font-black text-white">
                   {isKota ? 'Rp 0' : 'Rp 15.000'}
                 </span>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  Pilih Wilayah / Kecamatan di Cirebon:
-                </label>
-                <select
-                  value={areaName}
-                  onChange={(e) => setAreaName(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-cyan-400 text-white text-xs outline-none transition-colors"
-                >
-                  <optgroup label="── KOTA CIREBON (GRATIS ONGKIR Rp 0) ──">
-                    {CIREBON_AREAS.filter(a => a.type === 'Kota').map((a) => (
-                      <option key={a.name} value={a.name}>
-                        {a.name} — GRATIS ONGKIR
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="── KABUPATEN CIREBON (ONGKIR 15k) ──">
-                    {CIREBON_AREAS.filter(a => a.type === 'Kabupaten').map((a) => (
-                      <option key={a.name} value={a.name}>
-                        {a.name} — Ongkir 15k
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
               </div>
 
               {/* Input Alamat Lengkap & Patokan Rumah */}

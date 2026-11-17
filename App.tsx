@@ -479,8 +479,10 @@ export const App: React.FC = () => {
     if (data.shoeSize) {
       setPreselectedShoeSize(data.shoeSize);
     }
+    if (data.areaName) {
+      setPreselectedArea(data.areaName);
+    }
     setPreselectedPairsCount(data.pairsCount);
-    setPreselectedArea(data.areaName);
     handleScrollToSection('antar-jemput');
   };
 
