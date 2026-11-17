@@ -26,7 +26,8 @@ import { Order, OrderStatus, ServiceItem, ShoeType, DamageSeverity, AdminUser, C
 import { adminAuthService } from './services/adminAuthService';
 import { courierAuthService } from './services/courierAuthService';
 import { customerAuthService } from './services/customerAuthService';
-import { MessageSquare, Truck, Bot, LogOut, Wrench, AlertTriangle, RefreshCw, Calculator, WifiOff } from 'lucide-react';
+import { MessageSquare, Truck, Bot, LogOut, Wrench, AlertTriangle, RefreshCw, Calculator, WifiOff, Bell, CheckCircle2, X } from 'lucide-react';
+import { STATUS_LABELS } from './data/solcreftData';
 import { soundFx } from './services/soundEffects';
 import {
   subscribeToOrdersRealtime,
@@ -83,6 +84,43 @@ export const App: React.FC = () => {
   const [preselectedPairsCount, setPreselectedPairsCount] = useState<number>(1);
   const [preselectedArea, setPreselectedArea] = useState<string>('');
   const [preselectedShoeSize, setPreselectedShoeSize] = useState<string>('40');
+
+  // Pelacakan Notifikasi Real-Time Pelanggan (Saat Pesanan Diterima / Diproses / Dibatalkan)
+  const [myOrderIds, setMyOrderIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('soleman_customer_my_orders_v1');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+  const [customerNotifications, setCustomerNotifications] = useState<Array<{
+    uid: string;
+    orderId: string;
+    title: string;
+    message: string;
+    status: OrderStatus;
+    timestamp: string;
+  }>>([]);
+  const [browserNotifPermission, setBrowserNotifPermission] = useState<string>(() =>
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
+  );
+
+  const normalizePhoneForMatch = (ph?: string) => (ph || '').replace(/[^0-9]/g, '').replace(/^62/, '0');
+
+  const requestBrowserNotificationPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    try {
+      const res = await Notification.requestPermission();
+      setBrowserNotifPermission(res);
+      if (res === 'granted') {
+        new Notification('Notifikasi Soleman Aktif 🔔', {
+          body: 'Anda akan langsung mendapat info saat pesanan diterima atau diproses.',
+        });
+      }
+    } catch {}
+  };
 
   // Count pending unaccepted orders
   const pendingOrdersCount = orders.filter(o => !o.isAcceptedByAdmin).length;
@@ -156,11 +194,157 @@ export const App: React.FC = () => {
     };
   }, [retryTrigger]);
 
+  // Daftar pesanan milik pelanggan saat ini (dari browser lokal maupun akun customer login)
+  const myCustomerOrders = orders.filter((o) => {
+    if (myOrderIds.includes(o.id)) return true;
+    if (customerUser) {
+      if (o.customerId && o.customerId === customerUser.id) return true;
+      if (customerUser.phone && normalizePhoneForMatch(o.customerPhone) === normalizePhoneForMatch(customerUser.phone)) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  // Deteksi perubahan status pesanan pelanggan secara real-time & tampilkan notifikasi saat diterima / diproses
+  useEffect(() => {
+    if (adminUser || courierUser || myCustomerOrders.length === 0) return;
+
+    let seenMap: Record<string, { status: OrderStatus; isAcceptedByAdmin: boolean }> = {};
+    try {
+      const raw = localStorage.getItem('soleman_customer_seen_states_v1');
+      if (raw) seenMap = JSON.parse(raw) || {};
+    } catch {}
+
+    const newAlerts: Array<{
+      uid: string;
+      orderId: string;
+      title: string;
+      message: string;
+      status: OrderStatus;
+      timestamp: string;
+    }> = [];
+
+    let updatedMap = { ...seenMap };
+
+    myCustomerOrders.forEach((order) => {
+      const prev = seenMap[order.id];
+      const currAccepted = Boolean(order.isAcceptedByAdmin);
+
+      if (!prev) {
+        // Pertama kali terlihat: catat status awal, dan jika sudah diterima/diproses sejak awal, tetap tampilkan
+        updatedMap[order.id] = { status: order.status, isAcceptedByAdmin: currAccepted };
+        if (currAccepted || order.status !== 'menunggu_jemput') {
+          const title =
+            order.status === 'dibatalkan'
+              ? `❌ Pesanan #${order.id} Dibatalkan`
+              : order.status === 'perjalanan_workshop'
+              ? `🎉 Pesanan #${order.id} Diterima!`
+              : order.status === 'pengerjaan'
+              ? `🛠️ Pesanan #${order.id} Sedang Diproses!`
+              : `📦 Update Pesanan #${order.id}: ${STATUS_LABELS[order.status].label}`;
+          const message =
+            order.status === 'dibatalkan'
+              ? `Mohon maaf, pesanan ${order.shoeBrand} dibatalkan (${order.cancellationReason || 'Stok tapak/bahan sedang kosong'}).`
+              : order.status === 'perjalanan_workshop'
+              ? `Pesanan ${order.shoeBrand} Anda diterima! ${order.assignedCourier || 'Kurir Soleman'} siap menuju lokasi Anda.`
+              : order.status === 'pengerjaan'
+              ? `Sepatu ${order.shoeBrand} sedang dikerjakan teknisi ahli Workshop Soleman Cirebon.`
+              : order.timeline[0]?.description || `Status terbaru: ${STATUS_LABELS[order.status].label}.`;
+          newAlerts.push({
+            uid: `${order.id}-${order.status}-${Date.now()}`,
+            orderId: order.id,
+            title,
+            message,
+            status: order.status,
+            timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+          });
+        }
+        return;
+      }
+
+      const statusChanged = prev.status !== order.status;
+      const justAccepted = !prev.isAcceptedByAdmin && currAccepted;
+
+      if (statusChanged || justAccepted) {
+        updatedMap[order.id] = { status: order.status, isAcceptedByAdmin: currAccepted };
+
+        let title = `📦 Update Pesanan #${order.id}`;
+        let message = `Status pesanan ${order.shoeBrand}: ${STATUS_LABELS[order.status]?.label || order.status}.`;
+
+        if (order.status === 'dibatalkan') {
+          title = `❌ Pesanan #${order.id} Dibatalkan`;
+          message = `Mohon maaf, pesanan ${order.shoeBrand} dibatalkan (${order.cancellationReason || 'Stok tapak/bahan sedang kosong'}).`;
+        } else if (justAccepted || order.status === 'perjalanan_workshop') {
+          title = `🎉 Pesanan #${order.id} Diterima!`;
+          message = `Admin/Kurir Soleman menerima pesanan ${order.shoeBrand} Anda. ${order.assignedCourier || 'Kurir Soleman'} siap meluncur ke lokasi!`;
+        } else if (order.status === 'pengerjaan') {
+          title = `🛠️ Pesanan #${order.id} Sedang Diproses!`;
+          message = `Sepatu ${order.shoeBrand} sudah di workshop & sedang ditangani teknisi Soleman Cirebon.`;
+        } else if (order.status === 'quality_check') {
+          title = `🔍 Pesanan #${order.id} Quality Control`;
+          message = `Sepatu ${order.shoeBrand} sedang diperiksa kerapian jahitan/lem & sterilisasi akhir.`;
+        } else if (order.status === 'siap_antar') {
+          title = `🚚 Sepatu #${order.id} Siap Diantar!`;
+          message = `Reparasi ${order.shoeBrand} selesai! Kurir segera mengantar kembali ke lokasi Anda.`;
+        } else if (order.status === 'selesai') {
+          title = `✅ Pesanan #${order.id} Selesai!`;
+          message = `Servis ${order.shoeBrand} telah diterima. Garansi resmi Soleman aktif.`;
+        }
+
+        newAlerts.push({
+          uid: `${order.id}-${order.status}-${currAccepted}-${Date.now()}`,
+          orderId: order.id,
+          title,
+          message,
+          status: order.status,
+          timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+        });
+      }
+    });
+
+    try {
+      localStorage.setItem('soleman_customer_seen_states_v1', JSON.stringify(updatedMap));
+    } catch {}
+
+    if (newAlerts.length > 0) {
+      try {
+        soundFx.playSuccess();
+      } catch {}
+      setCustomerNotifications((prev) => [...newAlerts, ...prev].slice(0, 5));
+
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        newAlerts.forEach((al) => {
+          try {
+            new Notification(al.title, { body: al.message });
+          } catch {}
+        });
+      }
+    }
+  }, [orders, myOrderIds, customerUser, adminUser, courierUser]);
+
   // Handle adding new order & simpan langsung ke koleksi 'oderan' di Firebase Firestore (default)
   const handleOrderCreated = (newOrder: Order) => {
     const orderWithCustomer = customerUser && !newOrder.customerId
       ? { ...newOrder, customerId: customerUser.id }
       : newOrder;
+
+    // Simpan ID order pelanggan di browser ini agar menerima notifikasi real-time saat diterima/diproses
+    setMyOrderIds((prev) => {
+      const next = prev.includes(orderWithCustomer.id) ? prev : [orderWithCustomer.id, ...prev].slice(0, 15);
+      try {
+        localStorage.setItem('soleman_customer_my_orders_v1', JSON.stringify(next));
+        const rawSeen = localStorage.getItem('soleman_customer_seen_states_v1');
+        const seen = rawSeen ? JSON.parse(rawSeen) : {};
+        seen[orderWithCustomer.id] = {
+          status: orderWithCustomer.status,
+          isAcceptedByAdmin: Boolean(orderWithCustomer.isAcceptedByAdmin),
+        };
+        localStorage.setItem('soleman_customer_seen_states_v1', JSON.stringify(seen));
+      } catch {}
+      return next;
+    });
+
     setOrders(prev => {
       const existingIdx = prev.findIndex(o => o.id.toUpperCase() === orderWithCustomer.id.toUpperCase());
       if (existingIdx !== -1) {
@@ -751,7 +935,7 @@ export const App: React.FC = () => {
           onApplyEstimate={handleApplyEstimate}
         />
 
-        {/* 4. Booking Antar-Jemput + Bagi Lokasi Akurat ke Kurir */}
+        {/* 4. Booking Antar-Jemput + Bagi Lokasi Akurat ke Kurir + Status Live Pesanan Pelanggan */}
         <PickupOrderSection
           initialServices={preselectedServices}
           initialShoeType={preselectedShoeType}
@@ -761,9 +945,75 @@ export const App: React.FC = () => {
           initialShoeSize={preselectedShoeSize}
           stockMap={stockMap}
           customerUser={customerUser}
+          myActiveOrders={myCustomerOrders}
+          browserNotifPermission={browserNotifPermission}
+          onRequestBrowserNotif={requestBrowserNotificationPermission}
           onOrderCreated={handleOrderCreated}
           onOpenDashboard={() => handleScrollToSection('antar-jemput')}
         />
+
+        {/* Real-Time Customer Notification Toast Stack (Ketika Pesanan Diterima atau Diproses) */}
+        {customerNotifications.length > 0 && (
+          <div className="fixed top-20 right-4 left-4 sm:left-auto sm:w-96 z-50 space-y-2.5 pointer-events-none">
+            {customerNotifications.map((notif) => (
+              <div
+                key={notif.uid}
+                className={`pointer-events-auto p-4 rounded-2xl border shadow-2xl backdrop-blur-xl transition-all ${
+                  notif.status === 'dibatalkan'
+                    ? 'bg-rose-950/95 border-rose-400/60 text-white'
+                    : 'bg-slate-900/95 border-emerald-400/60 text-white shadow-emerald-500/20'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2.5">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                      notif.status === 'dibatalkan'
+                        ? 'bg-rose-500/20 text-rose-300'
+                        : 'bg-emerald-500/20 text-emerald-300'
+                    }`}>
+                      {notif.status === 'dibatalkan' ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-white">{notif.title}</span>
+                        <span className="text-[10px] font-mono text-slate-400">{notif.timestamp}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-200 leading-relaxed">{notif.message}</p>
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleScrollToSection('antar-jemput');
+                            setCustomerNotifications((prev) => prev.filter((x) => x.uid !== notif.uid));
+                          }}
+                          className="text-[10px] font-bold text-cyan-300 hover:text-cyan-200 underline cursor-pointer"
+                        >
+                          Lihat Status Pesanan Saya
+                        </button>
+                        {browserNotifPermission === 'default' && (
+                          <button
+                            type="button"
+                            onClick={requestBrowserNotificationPermission}
+                            className="text-[10px] font-bold text-amber-300 hover:text-amber-200 inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Bell className="w-3 h-3" /> Aktifkan Notif HP
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCustomerNotifications((prev) => prev.filter((x) => x.uid !== notif.uid))}
+                    className="p-1 text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 5. Testimonials & FAQs + Write Review Form */}
         <TestimonialsAndFaq />

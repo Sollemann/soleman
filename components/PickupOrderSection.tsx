@@ -21,6 +21,8 @@ import {
   QrCode, 
   Crosshair,
   ClipboardPaste,
+  Bell,
+  Navigation,
   Check
 } from 'lucide-react';
 import { 
@@ -29,6 +31,7 @@ import {
   KOTA_CIREBON_KECAMATAN,
   WORKSHOP_INFO, 
   SHOE_SIZES,
+  STATUS_LABELS,
   isTapakOrSoleSizeRequired,
   calculateDistanceToWorkshop,
   calculateServicePrice,
@@ -82,6 +85,9 @@ interface PickupOrderSectionProps {
   initialShoeSize?: string;
   stockMap?: Record<string, ServiceStockItem>;
   customerUser?: CustomerUser | null;
+  myActiveOrders?: Order[];
+  browserNotifPermission?: string;
+  onRequestBrowserNotif?: () => void;
   onOrderCreated: (order: Order) => void;
   onOpenDashboard: () => void;
   onOpenTrackerWithId?: (orderId: string) => void;
@@ -110,6 +116,9 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   initialShoeSize,
   stockMap,
   customerUser,
+  myActiveOrders = [],
+  browserNotifPermission,
+  onRequestBrowserNotif,
   onOrderCreated,
 }) => {
   // Customer Info State
@@ -167,12 +176,14 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   const [pickupType] = useState<'antar_jemput' | 'drop_off'>('antar_jemput');
   const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Kota Cirebon (Otomatis via Lokasi)');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsAccuracyMeters, setGpsAccuracyMeters] = useState<number | null>(null);
   const [shareLocInput, setShareLocInput] = useState('');
   const [isLocatingGps, setIsLocatingGps] = useState(false);
   const [gpsStatusMsg, setGpsStatusMsg] = useState('');
   const shareInputRef = React.useRef<HTMLInputElement>(null);
+  const watchIdRef = React.useRef<number | null>(null);
 
-  // Jika izin GPS sudah pernah diberikan sebelumnya, langsung kunci titik lokasi otomatis
+  // Jika izin GPS sudah pernah diberikan sebelumnya, langsung kunci titik lokasi akurat otomatis
   useEffect(() => {
     if (typeof navigator === 'undefined' || !navigator.permissions?.query) return;
     navigator.permissions
@@ -183,6 +194,12 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
         }
       })
       .catch(() => {});
+
+    return () => {
+      if (watchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
   }, []);
 
   // Active Menu Tab for Service Selection (Organized by Menu Category)
@@ -351,33 +368,95 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     updateActiveShoe({ photoPreview: undefined, aiDetectedSeverity: undefined, aiDiagnostics: undefined });
   };
 
-  // Deteksi GPS Koordinat 1-Klik Otomatis & Pemilihan Wilayah Cirebon Terdekat
+  // Deteksi GPS Akurasi Tinggi 1-Klik (Multi-Sample watchPosition, tanpa cache lama)
+  const applyAccurateCoords = (lat: number, lng: number, accuracyMeters: number | null, sourceLabel: string) => {
+    const cleanLat = Number(lat.toFixed(6));
+    const cleanLng = Number(lng.toFixed(6));
+    const dist = calculateDistanceToWorkshop(cleanLat, cleanLng);
+    const closest = findClosestCirebonArea(cleanLat, cleanLng);
+    const mapsLink = `https://www.google.com/maps?q=${cleanLat},${cleanLng}`;
+    setAreaName(closest.name);
+    setGpsCoords({ lat: cleanLat, lng: cleanLng });
+    setGpsAccuracyMeters(accuracyMeters);
+    setShareLocInput(mapsLink);
+    const accText = accuracyMeters ? ` • Akurasi ±${accuracyMeters}m` : '';
+    setGpsStatusMsg(
+      `✓ ${sourceLabel}: ${closest.name} (${closest.type === 'Kota' ? 'GRATIS ONGKIR Kota' : 'Ongkir 15k Kab.'}) • ±${dist} KM${accText}`
+    );
+  };
+
   const handleDetectGps = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setGpsStatusMsg('Perangkat belum mendukung GPS otomatis. Salin link Google Maps lalu pencet Tempel Otomatis.');
       return;
     }
+
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+
     setIsLocatingGps(true);
-    setGpsStatusMsg('Mengunci titik koordinat GPS akurat untuk Kurir...');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = Number(pos.coords.latitude.toFixed(6));
-        const lng = Number(pos.coords.longitude.toFixed(6));
-        const dist = calculateDistanceToWorkshop(lat, lng);
-        const closest = findClosestCirebonArea(lat, lng);
-        const mapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
-        setAreaName(closest.name);
-        setGpsCoords({ lat, lng });
-        setShareLocInput(mapsLink);
-        setIsLocatingGps(false);
-        setGpsStatusMsg(`✓ Lokasi Akurat Terkunci: ${closest.name} (${closest.type === 'Kota' ? 'GRATIS ONGKIR Kota' : 'Ongkir 15k Kabupaten'}) • ±${dist} KM dari Workshop`);
+    setGpsStatusMsg('Mengkalibrasi sinyal GPS presisi tinggi (tanpa cache)...');
+
+    let bestPos: GeolocationPosition | null = null;
+    let settled = false;
+
+    const finalizeBest = () => {
+      if (settled) return;
+      settled = true;
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      setIsLocatingGps(false);
+      if (bestPos) {
+        const acc = Math.round(bestPos.coords.accuracy || 0);
+        applyAccurateCoords(
+          bestPos.coords.latitude,
+          bestPos.coords.longitude,
+          acc || null,
+          acc > 200 ? 'Lokasi WiFi/Jaringan Terkunci' : 'Lokasi GPS Akurat Terkunci'
+        );
         soundFx.playSuccess();
+      } else {
+        setGpsStatusMsg('Izin GPS belum aktif. Salin link Share-Loc / Google Maps rumah Anda lalu pencet tombol Tempel Otomatis!');
+      }
+    };
+
+    const calibrationTimer = window.setTimeout(() => {
+      if (bestPos) {
+        finalizeBest();
+      }
+    }, 3500);
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!bestPos || (pos.coords.accuracy || 9999) < (bestPos.coords.accuracy || 9999)) {
+          bestPos = pos;
+          const accNow = Math.round(pos.coords.accuracy || 0);
+          setGpsStatusMsg(`Menyaring koordinat terbaik... (akurasi saat ini ±${accNow} m)`);
+          if (accNow > 0 && accNow <= 22) {
+            window.clearTimeout(calibrationTimer);
+            finalizeBest();
+          }
+        }
       },
       () => {
-        setIsLocatingGps(false);
-        setGpsStatusMsg('Izin GPS belum aktif. Salin link Share-Loc / Google Maps rumah Anda lalu pencet tombol Tempel Otomatis!');
+        window.clearTimeout(calibrationTimer);
+        if (bestPos) {
+          finalizeBest();
+        } else {
+          settled = true;
+          if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+          }
+          setIsLocatingGps(false);
+          setGpsStatusMsg('Izin GPS belum aktif. Salin link Share-Loc / Google Maps rumah Anda lalu pencet tombol Tempel Otomatis!');
+        }
       },
-      { enableHighAccuracy: true, timeout: 9000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 }
     );
   };
 
@@ -385,16 +464,33 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     setShareLocInput(val);
     const parsed = parseShareLocInput(val);
     if (parsed.lat && parsed.lng) {
-      const dist = calculateDistanceToWorkshop(parsed.lat, parsed.lng);
-      const closest = findClosestCirebonArea(parsed.lat, parsed.lng);
-      setAreaName(closest.name);
-      setGpsCoords({ lat: parsed.lat, lng: parsed.lng });
-      setGpsStatusMsg(`✓ Titik Maps Terdeteksi Otomatis: ${closest.name} (${closest.type === 'Kota' ? 'GRATIS ONGKIR Kota' : 'Ongkir 15k Kab.'}) • ±${dist} KM`);
+      applyAccurateCoords(parsed.lat, parsed.lng, 10, 'Pin Maps Terdeteksi Akurat');
+      soundFx.playSuccess();
     } else if (parsed.cleanUrl) {
       setGpsCoords(null);
-      setGpsStatusMsg('✓ Link Google Maps berhasil ditempel otomatis dan siap dikirim akurat ke Kurir!');
+      setGpsAccuracyMeters(null);
+      setGpsStatusMsg('⏳ Mengurai koordinat asli dari link Google Maps...');
+      fetch('/api/resolve-maps-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: parsed.cleanUrl }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.lat && data?.lng) {
+            applyAccurateCoords(data.lat, data.lng, 10, 'Link Google Maps Akurat Terkunci');
+            setShareLocInput(parsed.cleanUrl!);
+            soundFx.playSuccess();
+          } else {
+            setGpsStatusMsg('✓ Link Google Maps berhasil ditempel otomatis dan siap dibuka Kurir!');
+          }
+        })
+        .catch(() => {
+          setGpsStatusMsg('✓ Link Google Maps berhasil ditempel otomatis dan siap dibuka Kurir!');
+        });
     } else if (!val.trim()) {
       setGpsCoords(null);
+      setGpsAccuracyMeters(null);
       setGpsStatusMsg('');
     }
   };
@@ -406,7 +502,6 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
         const clipText = await navigator.clipboard.readText();
         if (clipText && clipText.trim()) {
           handleShareLocInputChange(clipText.trim());
-          soundFx.playSuccess();
           return;
         }
         setGpsStatusMsg('Clipboard masih kosong. Salin link Share-Loc / Google Maps dulu, lalu pencet Tempel Otomatis.');
@@ -416,7 +511,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
     } catch {
       // Fallback bila browser membatasi akses baca clipboard otomatis
     }
-    setGpsStatusMsg('Tekan & tahan kotak link lalu pilih Tempel/Paste — titik lokasi otomatis terbaca.');
+    setGpsStatusMsg('Tekan & tahan kotak link lalu pilih Tempel/Paste — koordinat titik lokasi langsung terbaca.');
     shareInputRef.current?.focus();
   };
 
@@ -610,69 +705,157 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
         </p>
       </div>
 
-      {/* Success Notification after Order Created */}
-      {createdOrder && (
-        <div className="mb-8 p-6 rounded-3xl bg-slate-900 border border-cyan-400/60 shadow-[0_0_25px_rgba(0,240,255,0.25)] space-y-4">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-cyan-400 text-slate-950 flex items-center justify-center shrink-0 font-bold shadow-lg shadow-cyan-400/40">
-              <CheckCircle2 className="w-7 h-7 stroke-[2.5]" />
-            </div>
-            <div className="space-y-1.5">
-              <span className="text-xs font-bold text-cyan-400 uppercase tracking-widest">
-                Pesanan Berhasil Dicatat & Masuk Portal Kurir!
-              </span>
-              <h3 className="text-xl font-extrabold text-white">
-                Kode Seri Order: #{createdOrder.id}
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Pesanan Anda untuk {createdOrder.pairsCount} pasang ({createdOrder.shoeBrand}{createdOrder.shoeSize ? ` • Ukuran EU ${createdOrder.shoeSize}` : ''}) atas nama <strong>{createdOrder.customerName}</strong> di <strong>{createdOrder.location.areaName}</strong> telah tersimpan. Total: <strong>Rp {createdOrder.totalAmount.toLocaleString('id-ID')}</strong> ({createdOrder.paymentMethod.toUpperCase()}).
-              </p>
-              {createdOrder.location.mapsUrl ? (
-                <div className="text-[11px] text-emerald-300 font-semibold flex items-center gap-1.5 flex-wrap pt-0.5">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span>Titik lokasi GPS/Maps sudah terkunci akurat untuk Kurir Soleman.</span>
-                  <a
-                    href={createdOrder.location.mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline text-cyan-300 hover:text-white"
-                  >
-                    Lihat Titik Maps
-                  </a>
+      {/* Real-Time Live Customer Order Status Card (Selalu sinkron dari Firestore saat diterima / diproses / selesai) */}
+      {(() => {
+        const liveCreatedOrder = createdOrder
+          ? myActiveOrders.find((o) => o.id === createdOrder.id) || createdOrder
+          : null;
+        const ordersToShow = liveCreatedOrder
+          ? [liveCreatedOrder, ...myActiveOrders.filter((o) => o.id !== liveCreatedOrder.id).slice(0, 1)]
+          : myActiveOrders.slice(0, 2);
+
+        if (ordersToShow.length === 0) return null;
+
+        return (
+          <div className="mb-8 space-y-4">
+            {ordersToShow.map((ord, idx) => {
+              const stInfo = STATUS_LABELS[ord.status] || STATUS_LABELS.menunggu_jemput;
+              const isCancelled = ord.status === 'dibatalkan';
+              const isAccepted = Boolean(ord.isAcceptedByAdmin) && !isCancelled;
+
+              return (
+                <div
+                  key={ord.id}
+                  className={`p-5 sm:p-6 rounded-3xl border shadow-2xl space-y-4 transition-all ${
+                    isCancelled
+                      ? 'bg-rose-950/60 border-rose-500/60'
+                      : ord.status === 'selesai'
+                      ? 'bg-emerald-950/40 border-emerald-400/60'
+                      : isAccepted
+                      ? 'bg-slate-900 border-emerald-400/60 shadow-[0_0_25px_rgba(16,185,129,0.2)]'
+                      : 'bg-slate-900 border-cyan-400/60 shadow-[0_0_25px_rgba(0,240,255,0.2)]'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="flex items-start gap-3.5">
+                      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 font-bold shadow-lg ${
+                        isCancelled
+                          ? 'bg-rose-500 text-white'
+                          : isAccepted
+                          ? 'bg-emerald-400 text-slate-950'
+                          : 'bg-cyan-400 text-slate-950'
+                      }`}>
+                        <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${stInfo.badgeBg}`}>
+                            {isCancelled
+                              ? '❌ Dibatalkan'
+                              : !ord.isAcceptedByAdmin
+                              ? '⏳ Menunggu Konfirmasi Admin / Kurir'
+                              : ord.status === 'perjalanan_workshop'
+                              ? '🎉 Pesanan Diterima • Kurir Menjemput'
+                              : ord.status === 'pengerjaan'
+                              ? '🛠️ Sedang Diproses di Workshop'
+                              : stInfo.label}
+                          </span>
+                          <span className="text-xs font-mono font-bold text-slate-300">#{ord.id}</span>
+                        </div>
+
+                        <h3 className="text-base sm:text-lg font-extrabold text-white">
+                          {ord.shoeBrand}{ord.shoeSize ? ` (EU ${ord.shoeSize})` : ''} • {ord.pairsCount} Pasang
+                        </h3>
+
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {isCancelled
+                            ? `Pesanan dibatalkan: ${ord.cancellationReason || 'Stok tapak / bahan sedang kosong.'}`
+                            : !ord.isAcceptedByAdmin
+                            ? `Pesanan atas nama ${ord.customerName} telah masuk ke portal Admin & Kurir. Halaman ini otomatis memberi notifikasi saat diterima atau diproses.`
+                            : ord.timeline?.[0]?.description || `Diproses oleh ${ord.assignedCourier || 'Tim Soleman Cirebon'}.`}
+                        </p>
+
+                        {ord.location.mapsUrl && (
+                          <div className="text-[11px] text-emerald-300 font-semibold flex items-center gap-1.5 flex-wrap pt-0.5">
+                            <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span>Titik lokasi terkunci akurat ({ord.location.areaName}).</span>
+                            <a
+                              href={ord.location.mapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline text-cyan-300 hover:text-white"
+                            >
+                              Cek Titik Maps
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {onRequestBrowserNotif && browserNotifPermission !== 'granted' && browserNotifPermission !== 'unsupported' && (
+                      <button
+                        type="button"
+                        onClick={onRequestBrowserNotif}
+                        className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+                      >
+                        <Bell className="w-3.5 h-3.5" />
+                        <span>Aktifkan Notif Browser/HP</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Step Progress Strip */}
+                  {!isCancelled && (
+                    <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-800/80 text-[10px] font-bold">
+                      {[
+                        { label: '1. Masuk', active: true },
+                        { label: '2. Diterima', active: Boolean(ord.isAcceptedByAdmin) },
+                        { label: '3. Diproses', active: ['pengerjaan', 'quality_check', 'siap_antar', 'selesai'].includes(ord.status) },
+                        { label: '4. Selesai', active: ord.status === 'selesai' },
+                      ].map((step) => (
+                        <div
+                          key={step.label}
+                          className={`px-2 py-1.5 rounded-xl text-center border ${
+                            step.active
+                              ? 'bg-emerald-500/15 border-emerald-400/50 text-emerald-300'
+                              : 'bg-slate-950/60 border-slate-800 text-slate-500'
+                          }`}
+                        >
+                          {step.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {idx === 0 && createdOrder && (
+                    <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const waUrl = buildNewOrderWhatsAppUrl(ord);
+                          window.open(waUrl, '_blank');
+                        }}
+                        className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
+                      >
+                        <MessageSquare className="w-4 h-4 stroke-[2.5]" />
+                        <span>Kirim Konfirmasi & Share Loc ke WhatsApp (0831-5227-6387)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setCreatedOrder(null)}
+                        className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all cursor-pointer"
+                      >
+                        <span>Tutup / Pesan Lagi</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <p className="text-[11px] text-amber-300">
-                  Alamat patokan: {createdOrder.location.fullAddress}. Kurir akan mengonfirmasi via WhatsApp sebelum meluncur.
-                </p>
-              )}
-            </div>
+              );
+            })}
           </div>
-
-          <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                const waUrl = buildNewOrderWhatsAppUrl(createdOrder);
-                window.open(waUrl, '_blank');
-              }}
-              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer"
-            >
-              <MessageSquare className="w-4 h-4 stroke-[2.5]" />
-              <span>Kirim Konfirmasi & Share Loc ke WhatsApp (0831-5227-6387)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setCreatedOrder(null);
-              }}
-              className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all cursor-pointer"
-            >
-              <span>Tutup / Pesan Lagi</span>
-            </button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Main Order Form Card */}
       <div className="bg-slate-900/90 border border-cyan-500/20 rounded-3xl p-5 sm:p-7 shadow-xl space-y-6">
@@ -1065,7 +1248,11 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                 </div>
 
                 {gpsStatusMsg && (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-emerald-300 bg-emerald-950/40 px-3 py-2 rounded-lg border border-emerald-500/30">
+                  <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] px-3 py-2 rounded-lg border ${
+                    gpsAccuracyMeters && gpsAccuracyMeters > 200
+                      ? 'text-amber-200 bg-amber-950/40 border-amber-500/40'
+                      : 'text-emerald-300 bg-emerald-950/40 border-emerald-500/30'
+                  }`}>
                     <span>{gpsStatusMsg}</span>
                     {(gpsCoords || parseShareLocInput(shareLocInput).cleanUrl) && (
                       <a
@@ -1074,9 +1261,51 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-cyan-300 hover:text-white font-bold underline shrink-0"
                       >
-                        <MapPin className="w-3 h-3" />
-                        <span>Cek Titik Maps</span>
+                        <Navigation className="w-3 h-3" />
+                        <span>Buka Pin di Maps</span>
                       </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Visual Pin Preview Map when accurate coordinates locked */}
+                {gpsCoords && (
+                  <div className="rounded-xl overflow-hidden border border-cyan-500/40 bg-slate-900 space-y-1.5">
+                    <div className="px-3 py-1.5 bg-slate-950/80 flex items-center justify-between text-[10px]">
+                      <span className="font-bold text-cyan-300 flex items-center gap-1.5">
+                        <MapPin className="w-3 h-3 text-cyan-400" />
+                        Pin Lokasi Terkunci ({gpsCoords.lat}, {gpsCoords.lng})
+                        {gpsAccuracyMeters !== null && (
+                          <span className={`px-1.5 py-0.5 rounded font-mono ${
+                            gpsAccuracyMeters <= 50
+                              ? 'bg-emerald-500/20 text-emerald-300'
+                              : gpsAccuracyMeters <= 200
+                              ? 'bg-sky-500/20 text-sky-300'
+                              : 'bg-amber-500/20 text-amber-300'
+                          }`}>
+                            ±{gpsAccuracyMeters}m
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleDetectGps}
+                        className="text-sky-400 hover:text-sky-300 font-bold cursor-pointer"
+                      >
+                        Kunci Ulang GPS
+                      </button>
+                    </div>
+                    <iframe
+                      title="Pratinjau Titik Penjemputan Kurir"
+                      src={`https://maps.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}&z=18&output=embed`}
+                      className="w-full h-44 border-0"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
+                    {gpsAccuracyMeters !== null && gpsAccuracyMeters > 200 && (
+                      <p className="px-3 pb-2 text-[10px] text-amber-300">
+                        Tip: GPS laptop/WiFi perkiraan ±{gpsAccuracyMeters}m. Agar pas depan rumah, salin titik pin dari aplikasi Google Maps lalu pencet <strong>Tempel Otomatis</strong>.
+                      </p>
                     )}
                   </div>
                 )}
@@ -1096,7 +1325,6 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
                         if (pasted) {
                           e.preventDefault();
                           handleShareLocInputChange(pasted.trim());
-                          soundFx.playSuccess();
                         }
                       }}
                       placeholder="Tempel link Maps (https://maps.app.goo.gl/... atau koordinat)"

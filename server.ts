@@ -37,6 +37,87 @@ async function startServer() {
     });
   });
 
+  // Resolve Google Maps shortlinks (maps.app.goo.gl / goo.gl/maps) into accurate lat/lng coordinates
+  app.post('/api/resolve-maps-link', async (req: Request, res: Response) => {
+    try {
+      const rawUrl = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+      if (!rawUrl) {
+        return res.status(400).json({ error: 'URL Maps tidak boleh kosong.' });
+      }
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(rawUrl);
+      } catch {
+        return res.status(400).json({ error: 'Format URL tidak valid.' });
+      }
+      if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+        return res.status(400).json({ error: 'Protokol URL tidak diizinkan.' });
+      }
+      const allowedHosts = new Set([
+        'maps.app.goo.gl',
+        'goo.gl',
+        'g.co',
+        'maps.google.com',
+        'google.com',
+        'www.google.com',
+        'maps.google.co.id',
+        'www.google.co.id',
+      ]);
+      if (!allowedHosts.has(parsedUrl.hostname.toLowerCase())) {
+        return res.status(400).json({ error: 'Domain bukan tautan Google Maps resmi.' });
+      }
+
+      const extractCoords = (text: string): { lat?: number; lng?: number } => {
+        const patterns = [
+          /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+          /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+          /[?&](?:q|ll|query|destination)=(-?\d+\.\d+),(-?\d+\.\d+)/,
+          /center=(-?\d+\.\d+)%2C(-?\d+\.\d+)/i,
+        ];
+        for (const regex of patterns) {
+          const m = text.match(regex);
+          if (m) {
+            const lat = Number(parseFloat(m[1]).toFixed(6));
+            const lng = Number(parseFloat(m[2]).toFixed(6));
+            if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+              return { lat, lng };
+            }
+          }
+        }
+        return {};
+      };
+
+      const directCheck = extractCoords(parsedUrl.toString());
+      if (directCheck.lat && directCheck.lng) {
+        return res.json({ resolvedUrl: parsedUrl.toString(), ...directCheck });
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5500);
+      try {
+        const resp = await fetch(parsedUrl.toString(), {
+          method: 'GET',
+          redirect: 'follow',
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36',
+          },
+        });
+        const finalUrl = resp.url || parsedUrl.toString();
+        let coords = extractCoords(finalUrl);
+        if (!coords.lat || !coords.lng) {
+          const bodyText = (await resp.text()).slice(0, 120000);
+          coords = extractCoords(bodyText);
+        }
+        return res.json({ resolvedUrl: finalUrl, ...coords });
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (err: any) {
+      return res.status(200).json({ resolvedUrl: req.body?.url || '', error: err?.message || 'Gagal resolve shortlink' });
+    }
+  });
+
   // Multimodal Gemini Diagnosis Endpoint
   app.post('/api/gemini/diagnose', async (req: Request, res: Response) => {
     try {
