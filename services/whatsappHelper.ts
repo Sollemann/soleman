@@ -439,27 +439,29 @@ ${serviceList}`;
       ? `🛵 *Logistik Pengantaran:* Mitra GrabExpress / Maxim Delivery & Kurir Soleman (Radius Kabupaten)`
       : `🛵 *Logistik Pengantaran:* Kurir Internal Soleman (Area Dekat / Kota Cirebon)`;
 
-  const gpsText = order.location.lat && order.location.lng
-    ? `\n📌 *Titik GPS Akurat:* ${order.location.lat.toFixed(6)}, ${order.location.lng.toFixed(6)}`
-    : '';
   const mapsPinUrl = order.location.mapsUrl || (order.location.lat && order.location.lng ? `https://www.google.com/maps?q=${order.location.lat},${order.location.lng}` : '');
+  const gpsText = order.location.lat && order.location.lng
+    ? `\n🧭 *Koordinat GPS Akurat:* ${order.location.lat.toFixed(6)}, ${order.location.lng.toFixed(6)}${order.location.accuracy ? ` (±${Math.round(order.location.accuracy)}m)` : ''}`
+    : '';
   const mapsShareLine = mapsPinUrl
-    ? `\n🗺️ *Link Share-Loc Kurir:* ${mapsPinUrl}`
-    : `\n📍 *Share-Loc Kurir:* _(Saya kirim titik 📍 Lokasi bawaan WhatsApp langsung di chat ini setelah pesan ini terkirim!)_`;
+    ? `\n📍 *Lokasi Saya Sekarang (Google Maps):*\n${mapsPinUrl}`
+    : `\n📍 *Lokasi Sekarang:* _(Saya kirim titik 📍 Lokasi bawaan WhatsApp langsung di chat ini)_`;
 
   const locationText = order.pickupType === 'drop_off'
     ? `🏢 *Metode:* Drop-off Langsung ke Workshop Soleman (Jl. Sukalila Selatan Cirebon)`
     : `${logisticsLabel}
-🏠 *Patokan / Alamat:* ${order.location.fullAddress || order.location.landmark || 'Share-Loc via WhatsApp'}
+🏠 *Patokan / Alamat:* ${order.location.fullAddress || order.location.landmark || 'Share-Loc Otomatis via WhatsApp'}
 ⏰ *Jadwal Jemput:* Sesi ${order.preferredTimeSlot.toUpperCase()}${gpsText}${mapsShareLine}`;
 
   const photoNote = (order.photos && order.photos.length > 0) || order.photoUrl
     ? `📸 *FOTO SEPATU RUSAK:* Sudah terunggah di sistem & saya siap kirim foto tambahan ke chat ini agar admin mudah cek kondisinya.${photoConfirmText}`
     : `📸 *FOTO SEPATU RUSAK:* Saya akan kirim foto fisiknya ke chat ini untuk dicek admin Soleman.${photoConfirmText}`;
 
-  const ongkirText = order.deliveryFee === 0 
-    ? 'Rp 0 (Drop-off Langsung ke Workshop)' 
-    : 'Rp 15.000 (Ongkir Flat Se-Cirebon)';
+  const ongkirText = order.pickupType === 'drop_off'
+    ? 'Rp 0 (Drop-off Langsung ke Workshop)'
+    : order.deliveryFee === 0
+    ? 'Rp 0 (GRATIS ONGKIR Kota Cirebon)'
+    : 'Rp 15.000 (Kabupaten Cirebon)';
 
   const courierToken = encodeOrderForCourierLink(order);
   const originUrl = typeof window !== 'undefined' ? window.location.origin : 'https://soleman.vercel.app';
