@@ -662,7 +662,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       })()}
 
       {/* Main Order Form Card */}
-      <div className="bg-slate-900/90 border border-cyan-500/20 rounded-3xl p-5 sm:p-7 shadow-xl space-y-6">
+      <div className="bg-slate-900/72 backdrop-blur-md border border-cyan-500/25 rounded-3xl p-5 sm:p-7 shadow-xl space-y-6">
         
         {/* Step 1: Customer Info */}
         <div className="space-y-3">

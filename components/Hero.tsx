@@ -47,7 +47,7 @@ export const Hero: React.FC<HeroProps> = ({
   };
 
   return (
-    <section className="relative overflow-hidden pt-8 pb-12 lg:pt-12 lg:pb-16 border-b border-slate-800">
+    <section className="relative overflow-hidden pt-8 pb-12 lg:pt-12 lg:pb-16 border-b border-cyan-500/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           
@@ -55,7 +55,7 @@ export const Hero: React.FC<HeroProps> = ({
           <div className="lg:col-span-7 space-y-5">
             
             {/* Top Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-medium text-slate-300">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950/60 backdrop-blur-md border border-cyan-500/35 text-xs font-medium text-slate-200 shadow-lg">
               <span className="flex h-2 w-2 rounded-full bg-sky-400" />
               <span>Layanan Antar-Jemput Sepatu Se-Cirebon</span>
               <span className="text-slate-600">•</span>
@@ -65,27 +65,27 @@ export const Hero: React.FC<HeroProps> = ({
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight drop-shadow-[0_2px_14px_rgba(4,10,28,0.9)]">
               Sepatu Rusak & Menganga? <br />
               <span className="text-sky-400">Soleman Kembalikan</span> Kuat Seperti Baru.
             </h1>
 
             {/* Subtitle */}
-            <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl">
-              Layanan reparasi sepatu resmi di Cirebon: sol copot, jahit sol tanam rapi tidak terlihat, ganti tapak baru, unyellowing, hingga recolor. Kurir siap jemput ke rumah Anda dengan <strong className="text-sky-400 font-semibold">GRATIS ONGKIR khusus Kota Cirebon</strong> (Kabupaten Rp 15.000).
+            <p className="text-slate-100 text-sm sm:text-base leading-relaxed max-w-2xl drop-shadow-[0_1px_10px_rgba(4,10,28,0.95)]">
+              Layanan reparasi sepatu resmi di Cirebon: sol copot, jahit sol tanam rapi tidak terlihat, ganti tapak baru, unyellowing, hingga recolor. Kurir siap jemput ke rumah Anda dengan <strong className="text-sky-300 font-semibold">GRATIS ONGKIR khusus Kota Cirebon</strong> (Kabupaten Rp 15.000).
             </p>
 
             {/* Key Value Badges */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
+              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-950/55 backdrop-blur-md border border-cyan-500/25 text-xs text-slate-100">
                 <Truck className="w-4 h-4 text-sky-400 shrink-0" />
                 <span>Gratis Ongkir Kota Cirebon</span>
               </div>
-              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
+              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-950/55 backdrop-blur-md border border-cyan-500/25 text-xs text-slate-100">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Garansi Resmi 30-90 Hari</span>
               </div>
-              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
+              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-950/55 backdrop-blur-md border border-cyan-500/25 text-xs text-slate-100">
                 <QrCode className="w-4 h-4 text-sky-400 shrink-0" />
                 <span>Bayar QRIS DANA & COD</span>
               </div>
@@ -98,7 +98,7 @@ export const Hero: React.FC<HeroProps> = ({
                   soundFx.playClick();
                   onOpenBooking();
                 }}
-                className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-bold text-white bg-sky-600 hover:bg-sky-500 shadow-md hover:shadow-sky-900/30 transition-all cursor-pointer"
+                className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-bold text-white bg-sky-600 hover:bg-sky-500 shadow-lg shadow-sky-900/40 transition-all cursor-pointer"
               >
                 <Truck className="w-4 h-4" />
                 <span>Pesan Antar-Jemput Sepatu</span>
@@ -109,22 +109,22 @@ export const Hero: React.FC<HeroProps> = ({
                   soundFx.playClick();
                   onExploreServices();
                 }}
-                className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-sm font-semibold text-slate-300 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:text-white transition-all cursor-pointer"
+                className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-sm font-semibold text-slate-100 bg-slate-950/60 backdrop-blur-md hover:bg-slate-900/85 border border-cyan-500/30 hover:text-white transition-all cursor-pointer"
               >
-                <Wrench className="w-4 h-4 text-slate-400" />
+                <Wrench className="w-4 h-4 text-cyan-400" />
                 <span>Lihat Katalog Kerusakan</span>
               </button>
             </div>
 
             {/* Quick Links */}
-            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-200">
               <button
                 type="button"
                 onClick={() => {
                   soundFx.playClick();
                   onExploreServices();
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-700/70 text-cyan-300 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950/60 backdrop-blur-md hover:bg-slate-900 border border-cyan-500/30 text-cyan-300 transition-colors cursor-pointer"
               >
                 <Wrench className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Pilih Kerusakan Sepatu Anda</span>
@@ -133,7 +133,7 @@ export const Hero: React.FC<HeroProps> = ({
               <button
                 type="button"
                 onClick={() => scrollToElement('kalkulator')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-700/70 text-slate-300 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950/60 backdrop-blur-md hover:bg-slate-900 border border-cyan-500/30 text-slate-100 transition-colors cursor-pointer"
               >
                 <Calculator className="w-3.5 h-3.5 text-sky-400" />
                 <span>Kalkulator Estimasi Biaya</span>
@@ -146,7 +146,7 @@ export const Hero: React.FC<HeroProps> = ({
                     soundFx.playQrScan();
                     onOpenQrModal();
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-slate-700/70 text-slate-300 transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950/60 backdrop-blur-md hover:bg-slate-900 border border-cyan-500/30 text-slate-100 transition-colors cursor-pointer"
                 >
                   <QrCode className="w-3.5 h-3.5 text-sky-400" />
                   <span>Kode QR DANA Resmi</span>
@@ -158,14 +158,14 @@ export const Hero: React.FC<HeroProps> = ({
 
           {/* Right Column: Clean Repair Solutions Showcase */}
           <div className="lg:col-span-5">
-            <div className="rounded-3xl bg-slate-900/90 border border-cyan-500/25 p-6 space-y-4 shadow-xl backdrop-blur-sm">
+            <div className="rounded-3xl bg-slate-950/62 border border-cyan-500/35 p-6 space-y-4 shadow-2xl backdrop-blur-md">
               <div className="flex items-start justify-between pb-3 border-b border-slate-800/80">
                 <div>
-                  <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Spesialis Reparasi Cirebon</span>
+                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Spesialis Reparasi Cirebon</span>
                   <h3 className="text-base font-extrabold text-white mt-0.5">Solusi Tuntas Kerusakan Sepatu</h3>
-                  <p className="text-xs text-slate-400">Pengerjaan rapi standar pabrik & bergaransi</p>
+                  <p className="text-xs text-slate-300">Pengerjaan rapi standar pabrik & bergaransi</p>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/35 flex items-center justify-center text-cyan-400 shrink-0">
                   <Wrench className="w-5 h-5" />
                 </div>
               </div>

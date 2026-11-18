@@ -1,0 +1,104 @@
+@keyframes batikArtworkDrift {
+  0% {
+    transform: scale(1.08) translate3d(-1.5%, -1%, 0);
+  }
+  50% {
+    transform: scale(1.14) translate3d(1.5%, 1.2%, 0);
+  }
+  100% {
+    transform: scale(1.08) translate3d(-1.5%, -1%, 0);
+  }
+}
+
+@keyframes batikArtworkDriftMobile {
+  0% {
+    transform: scale(1.06) translate3d(-1%, -1.5%, 0);
+  }
+  50% {
+    transform: scale(1.13) translate3d(1%, 1.8%, 0);
+  }
+  100% {
+    transform: scale(1.06) translate3d(-1%, -1.5%, 0);
+  }
+}
+
+@keyframes batikTileFlowLeft {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-260px, 0, 0);
+  }
+}
+
+@keyframes batikTileFlowRight {
+  0% {
+    transform: translate3d(-260px, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes batikGlowFloatA {
+  0%, 100% {
+    transform: translate3d(-50%, 0, 0) scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translate3d(-46%, 18px, 0) scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes batikGlowFloatB {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translate3d(-24px, -22px, 0) scale(1.12);
+    opacity: 0.95;
+  }
+}
+
+.batik-artwork-drift {
+  animation: batikArtworkDrift 20s ease-in-out infinite;
+  will-change: transform;
+}
+
+.batik-artwork-drift-mobile {
+  animation: batikArtworkDriftMobile 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+.batik-clouds-flow {
+  animation: batikTileFlowLeft 22s linear infinite;
+  will-change: transform;
+}
+
+.batik-udang-flow {
+  animation: batikTileFlowRight 28s linear infinite;
+  will-change: transform;
+}
+
+.batik-glow-float-a {
+  animation: batikGlowFloatA 14s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.batik-glow-float-b {
+  animation: batikGlowFloatB 18s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .batik-artwork-drift,
+  .batik-artwork-drift-mobile,
+  .batik-clouds-flow,
+  .batik-udang-flow,
+  .batik-glow-float-a,
+  .batik-glow-float-b {
+    animation: none;
+  }
+}

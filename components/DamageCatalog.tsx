@@ -195,7 +195,7 @@ export const DamageCatalog: React.FC<DamageCatalogProps> = ({
             <div
               key={service.id}
               onClick={() => handleSelect(service)}
-              className={`group bg-slate-900/80 backdrop-blur-sm border rounded-2xl p-3.5 transition-all duration-200 flex flex-col justify-between ${
+              className={`group bg-slate-900/68 backdrop-blur-md border rounded-2xl p-3.5 transition-all duration-200 flex flex-col justify-between ${
                 isOutOfStock
                   ? 'border-rose-500/40 opacity-75 cursor-not-allowed'
                   : 'border-slate-700/60 hover:border-cyan-400/60 cursor-pointer hover:shadow-xl hover:shadow-cyan-950/30 hover:-translate-y-0.5'
