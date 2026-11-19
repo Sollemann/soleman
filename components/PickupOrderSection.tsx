@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Truck, 
   MapPin, 
@@ -30,7 +30,8 @@ import {
   STATUS_LABELS,
   isTapakOrSoleSizeRequired,
   calculateServicePrice,
-  getServiceTierDetail
+  getServiceTierDetail,
+  detectCirebonDeliveryInfo
 } from '../data/solcreftData';
 import { 
   ServiceItem, 
@@ -170,6 +171,67 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   const [pickupType] = useState<'antar_jemput' | 'drop_off'>('antar_jemput');
   const [areaName, setAreaName] = useState<string>(initialArea || customerUser?.savedArea || 'Cirebon');
   const [mapsLinkInput, setMapsLinkInput] = useState<string>('');
+  const [resolvedMapsCoords, setResolvedMapsCoords] = useState<{ lat?: number; lng?: number; resolvedUrl?: string }>({});
+  const [isResolvingMapsLink, setIsResolvingMapsLink] = useState<boolean>(false);
+
+  // Otomatis ekstrak koordinat dari shortlink Google Maps (maps.app.goo.gl / goo.gl) agar deteksi Kota/Kabupaten akurat
+  useEffect(() => {
+    const trimmed = mapsLinkInput.trim();
+    if (!trimmed) {
+      setResolvedMapsCoords({});
+      return;
+    }
+
+    const directParsed = parseShareLocInput(trimmed);
+    if (directParsed.lat !== undefined && directParsed.lng !== undefined) {
+      setResolvedMapsCoords({
+        lat: directParsed.lat,
+        lng: directParsed.lng,
+        resolvedUrl: directParsed.cleanUrl,
+      });
+      return;
+    }
+
+    const isShortMaps = /https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs)/i.test(trimmed);
+    if (!isShortMaps) {
+      setResolvedMapsCoords({});
+      return;
+    }
+
+    const urlMatch = trimmed.match(/https?:\/\/[^\s]+/i);
+    if (!urlMatch) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setIsResolvingMapsLink(true);
+      try {
+        const res = await fetch('/api/resolve-maps-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: urlMatch[0] }),
+        });
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          if (typeof data.lat === 'number' && typeof data.lng === 'number') {
+            setResolvedMapsCoords({
+              lat: data.lat,
+              lng: data.lng,
+              resolvedUrl: data.resolvedUrl || urlMatch[0],
+            });
+          }
+        }
+      } catch {
+        // Fallback ke deteksi teks alamat jika offline
+      } finally {
+        if (!cancelled) setIsResolvingMapsLink(false);
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [mapsLinkInput]);
 
   // Active Menu Tab for Service Selection (Organized by Menu Category)
   const [activeFormMenuTab, setActiveFormMenuTab] = useState<'jahit' | 'sol' | 'treatment' | 'rekonstruksi'>('jahit');
@@ -374,8 +436,28 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
   const totalServicesPrice = shoeDetailsWithPrices.reduce((sum, s) => sum + s.price, 0);
 
-  // Aturan Ongkir: Kota Cirebon Gratis Ongkir (Rp 0), Kabupaten Rp 15.000
-  const deliveryFee = pickupType === 'drop_off' ? 0 : 0;
+  // Deteksi Otomatis Wilayah & Harga Ongkir (Kota Cirebon Rp 0, Kabupaten Cirebon Rp 15.000)
+  const parsedMapsNow = useMemo(() => {
+    return mapsLinkInput.trim() ? parseShareLocInput(mapsLinkInput) : {};
+  }, [mapsLinkInput]);
+
+  const effectiveCoords = useMemo(() => {
+    if (parsedMapsNow.lat !== undefined && parsedMapsNow.lng !== undefined) {
+      return { lat: parsedMapsNow.lat, lng: parsedMapsNow.lng };
+    }
+    if (resolvedMapsCoords.lat !== undefined && resolvedMapsCoords.lng !== undefined) {
+      return { lat: resolvedMapsCoords.lat, lng: resolvedMapsCoords.lng };
+    }
+    return undefined;
+  }, [parsedMapsNow, resolvedMapsCoords]);
+
+  const detectedDelivery = useMemo(() => {
+    const addressSource = [customerAddress, areaName !== 'Cirebon' ? areaName : ''].filter(Boolean).join(' ');
+    return detectCirebonDeliveryInfo(addressSource, mapsLinkInput, effectiveCoords);
+  }, [customerAddress, areaName, mapsLinkInput, effectiveCoords]);
+
+  // Aturan Ongkir Otomatis: Kota Cirebon Gratis Ongkir (Rp 0), Kabupaten Cirebon Rp 15.000
+  const deliveryFee = pickupType === 'drop_off' ? 0 : detectedDelivery.deliveryFee;
   const grandTotal = totalServicesPrice + deliveryFee;
 
   // Handle Order Submit: simpan pesanan & alamat lengkap ke Portal Kurir Soleman (dengan kunci anti-spam)
@@ -435,6 +517,9 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
     try {
       const parsedMaps = mapsLinkInput.trim() ? parseShareLocInput(mapsLinkInput) : {};
+      const finalLat = parsedMaps.lat ?? resolvedMapsCoords.lat;
+      const finalLng = parsedMaps.lng ?? resolvedMapsCoords.lng;
+      const finalMapsUrl = resolvedMapsCoords.resolvedUrl || parsedMaps.cleanUrl;
 
       const allPhotos = shoeDetailsWithPrices
         .map(s => s.photoUrl)
@@ -448,7 +533,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
         ? shoesList[0].shoeBrand 
         : `${shoesList[0].shoeBrand} (+${pairsCount - 1} pasang)`;
 
-      const cleanArea = areaName.trim() || 'Cirebon';
+      const cleanArea = detectedDelivery.areaName || areaName.trim() || 'Cirebon';
       const cleanAddressNote = customerAddress.trim();
 
       const newOrder: Order = {
@@ -469,19 +554,19 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
         photos: allPhotos,
         pickupType,
         preferredTimeSlot: 'siang',
-        distanceZone: 'dekat_kota',
+        distanceZone: detectedDelivery.distanceZone,
         logisticsPartner: 'kurir_soleman',
         customerConfirmedMaterialPhoto: true,
         location: {
           areaName: cleanArea,
-          areaType: 'Kota',
-          distanceZone: 'dekat_kota',
+          areaType: detectedDelivery.areaType,
+          distanceZone: detectedDelivery.distanceZone,
           logisticsPartner: 'kurir_soleman',
           shareLocViaWhatsApp: false,
-          isLiveShared: Boolean(parsedMaps.lat || parsedMaps.cleanUrl),
-          lat: parsedMaps.lat,
-          lng: parsedMaps.lng,
-          mapsUrl: parsedMaps.cleanUrl,
+          isLiveShared: Boolean(finalLat || finalMapsUrl),
+          lat: finalLat,
+          lng: finalLng,
+          mapsUrl: finalMapsUrl,
           fullAddress: cleanAddressNote || 'Lihat titik Google Maps pesanan',
           landmark: cleanAddressNote || 'Alamat penjemputan Kurir Soleman',
         },
@@ -1079,9 +1164,33 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
               />
             </div>
 
-            <div className="p-2.5 rounded-xl bg-cyan-950/35 border border-cyan-500/30 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-              <span className="text-cyan-300 font-semibold">
-                🛵 Gratis Ongkir wilayah Kota Cirebon • Kab. Cirebon Rp 15.000
+            <div
+              className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-2 text-[11px] transition-colors ${
+                detectedDelivery.areaType === 'Kabupaten'
+                  ? 'bg-amber-950/35 border-amber-400/45 text-amber-200'
+                  : 'bg-cyan-950/35 border-cyan-500/30 text-cyan-300'
+              }`}
+            >
+              <div className="flex items-center gap-2 font-semibold">
+                <MapPin className={`w-3.5 h-3.5 shrink-0 ${detectedDelivery.areaType === 'Kabupaten' ? 'text-amber-400' : 'text-cyan-400'}`} />
+                <span>
+                  {isResolvingMapsLink
+                    ? 'Memeriksa koordinat link Google Maps...'
+                    : detectedDelivery.areaType === 'Kabupaten'
+                    ? `Wilayah Kabupaten Cirebon terdeteksi (${detectedDelivery.matchedLabel}) — Ongkir Otomatis Rp 15.000`
+                    : detectedDelivery.matchedLabel
+                    ? `Wilayah Kota Cirebon terdeteksi (${detectedDelivery.matchedLabel}) — GRATIS ONGKIR (Rp 0)`
+                    : 'Gratis Ongkir Kota Cirebon • Kabupaten Cirebon otomatis Rp 15.000 sesuai alamat/Maps'}
+                </span>
+              </div>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-black font-mono shrink-0 ${
+                  detectedDelivery.areaType === 'Kabupaten'
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'bg-sky-500/20 text-sky-300 border border-sky-400/40'
+                }`}
+              >
+                {deliveryFee === 0 ? 'Ongkir Rp 0' : 'Ongkir Rp 15.000'}
               </span>
             </div>
           </div>
@@ -1138,10 +1247,10 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Biaya Ongkir Kurir:</span>
-              <span className={deliveryFee === 0 ? "text-sky-400 font-bold font-mono" : "text-slate-200 font-bold font-mono"}>
-                {deliveryFee === 0 
-                  ? 'Rp 0 (GRATIS ONGKIR Kota Cirebon)' 
-                  : 'Rp 15.000 (Kabupaten Cirebon)'}
+              <span className={deliveryFee === 0 ? "text-sky-400 font-bold font-mono" : "text-amber-300 font-bold font-mono"}>
+                {deliveryFee === 0
+                  ? 'Rp 0 (GRATIS ONGKIR Kota Cirebon)'
+                  : `Rp 15.000 (Kabupaten Cirebon${detectedDelivery.matchedLabel ? ` • ${detectedDelivery.matchedLabel}` : ''})`}
               </span>
             </div>
             <div className="flex justify-between text-sm font-black text-white pt-2 border-t border-slate-800">

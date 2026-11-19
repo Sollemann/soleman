@@ -114,6 +114,214 @@ export const ALL_CIREBON_KECAMATAN_SUGGESTIONS = [
   'Babakan', 'Gebang', 'Sedong', 'Greged'
 ];
 
+export interface DetectedCirebonDelivery {
+  areaType: 'Kota' | 'Kabupaten';
+  areaName: string;
+  deliveryFee: number;
+  distanceZone: 'dekat_kota' | 'jauh_kabupaten';
+  matchedBy: 'coords' | 'address' | 'default';
+  matchedLabel: string;
+}
+
+const KABUPATEN_CIREBON_KEYWORDS: { pattern: RegExp; label: string }[] = [
+  { pattern: /\bkab(?:upaten)?\.?\s*cirebon\b/i, label: 'Kabupaten Cirebon' },
+  { pattern: /\bkabupaten\b/i, label: 'Kabupaten Cirebon' },
+  { pattern: /\bkab\./i, label: 'Kabupaten Cirebon' },
+  { pattern: /\bpemkab\b/i, label: 'Kabupaten Cirebon' },
+  { pattern: /\bkedawung\b/i, label: 'Kedawung' },
+  { pattern: /\btuparev\b/i, label: 'Kedawung / Tuparev' },
+  { pattern: /\bkalikoa\b/i, label: 'Kedawung' },
+  { pattern: /\bsutawinangun\b/i, label: 'Kedawung' },
+  { pattern: /\bkertawinangun\b/i, label: 'Kedawung' },
+  { pattern: /\bpilang\b/i, label: 'Kedawung' },
+  { pattern: /\bweru\b/i, label: 'Weru' },
+  { pattern: /\bplered\b/i, label: 'Plered' },
+  { pattern: /\btrusmi\b/i, label: 'Plered / Trusmi' },
+  { pattern: /\bbattembat\b/i, label: 'Tengah Tani' },
+  { pattern: /\btengah\s*tani\b/i, label: 'Tengah Tani' },
+  { pattern: /\bdawuan\b/i, label: 'Tengah Tani' },
+  { pattern: /\bkemlakagede\b/i, label: 'Tengah Tani' },
+  { pattern: /\bsumber\b/i, label: 'Sumber' },
+  { pattern: /\bgegunung\b/i, label: 'Sumber' },
+  { pattern: /\bwatubelah\b/i, label: 'Sumber' },
+  { pattern: /\bperbutulan\b/i, label: 'Sumber' },
+  { pattern: /\btukmudal\b/i, label: 'Sumber' },
+  { pattern: /\bgunung\s*jati\b/i, label: 'Gunung Jati' },
+  { pattern: /\bklayan\b/i, label: 'Gunung Jati / Klayan' },
+  { pattern: /\bjadimulya\b/i, label: 'Gunung Jati' },
+  { pattern: /\bjatimerta\b/i, label: 'Gunung Jati' },
+  { pattern: /\bastana\b/i, label: 'Gunung Jati' },
+  { pattern: /\bcelancang\b/i, label: 'Gunung Jati' },
+  { pattern: /\bplumbon\b/i, label: 'Plumbon' },
+  { pattern: /\bmarikangen\b/i, label: 'Plumbon' },
+  { pattern: /\bkasugengan\b/i, label: 'Plumbon' },
+  { pattern: /\bbodesari\b/i, label: 'Plumbon' },
+  { pattern: /\bmundu\b/i, label: 'Mundu' },
+  { pattern: /\bwaruduwur\b/i, label: 'Mundu' },
+  { pattern: /\bsetupatok\b/i, label: 'Mundu' },
+  { pattern: /\bluwung\b/i, label: 'Mundu' },
+  { pattern: /\btalun\b/i, label: 'Talun' },
+  { pattern: /\bcirebon\s*girang\b/i, label: 'Talun' },
+  { pattern: /\bkepongpongan\b/i, label: 'Talun' },
+  { pattern: /\bkecomberan\b/i, label: 'Talun' },
+  { pattern: /\bcempaka\b/i, label: 'Talun' },
+  { pattern: /\bsampiran\b/i, label: 'Talun' },
+  { pattern: /\bpalimanan\b/i, label: 'Palimanan' },
+  { pattern: /\bpegagan\b/i, label: 'Palimanan' },
+  { pattern: /\blungbenda\b/i, label: 'Palimanan' },
+  { pattern: /\bklangenan\b/i, label: 'Klangenan' },
+  { pattern: /\bjemaras\b/i, label: 'Klangenan' },
+  { pattern: /\bbangodua\b/i, label: 'Klangenan' },
+  { pattern: /\barjawinangun\b/i, label: 'Arjawinangun' },
+  { pattern: /\bjungjang\b/i, label: 'Arjawinangun' },
+  { pattern: /\bastanajapura\b/i, label: 'Astanajapura' },
+  { pattern: /\bkanci\b/i, label: 'Astanajapura' },
+  { pattern: /\bbuntet\b/i, label: 'Astanajapura' },
+  { pattern: /\bbeber\b/i, label: 'Beber' },
+  { pattern: /\bhalimpu\b/i, label: 'Beber' },
+  { pattern: /\bkondangsari\b/i, label: 'Beber' },
+  { pattern: /\bdukupuntang\b/i, label: 'Dukupuntang' },
+  { pattern: /\bcisaat\b/i, label: 'Dukupuntang' },
+  { pattern: /\bdepok\b/i, label: 'Depok (Kab. Cirebon)' },
+  { pattern: /\bciwaringin\b/i, label: 'Ciwaringin' },
+  { pattern: /\bgempol\b/i, label: 'Gempol' },
+  { pattern: /\bjamblang\b/i, label: 'Jamblang' },
+  { pattern: /\bwangunharja\b/i, label: 'Jamblang' },
+  { pattern: /\bsusukan\s*lebak\b/i, label: 'Susukan Lebak' },
+  { pattern: /\bsusukan\b/i, label: 'Susukan' },
+  { pattern: /\bgegesik\b/i, label: 'Gegesik' },
+  { pattern: /\bkaliwedi\b/i, label: 'Kaliwedi' },
+  { pattern: /\bkapetakan\b/i, label: 'Kapetakan' },
+  { pattern: /\bsuranenggala\b/i, label: 'Suranenggala' },
+  { pattern: /\bpanguragan\b/i, label: 'Panguragan' },
+  { pattern: /\bkarangwareng\b/i, label: 'Karangwareng' },
+  { pattern: /\bkarangsembung\b/i, label: 'Karangsembung' },
+  { pattern: /\blemahabang\b/i, label: 'Lemahabang' },
+  { pattern: /\bsindanglaut\b/i, label: 'Lemahabang' },
+  { pattern: /\bpabuaran\b/i, label: 'Pabuaran' },
+  { pattern: /\bciledug\b/i, label: 'Ciledug' },
+  { pattern: /\bjatiseeng\b/i, label: 'Ciledug' },
+  { pattern: /\bwaled\b/i, label: 'Waled' },
+  { pattern: /\bpasaleman\b/i, label: 'Pasaleman' },
+  { pattern: /\bpabedilan\b/i, label: 'Pabedilan' },
+  { pattern: /\blosari\b/i, label: 'Losari' },
+  { pattern: /\bpanggangsari\b/i, label: 'Losari' },
+  { pattern: /\bbabakan\b/i, label: 'Babakan' },
+  { pattern: /\bgebang\b/i, label: 'Gebang' },
+  { pattern: /\bsedong\b/i, label: 'Sedong' },
+  { pattern: /\bgreged\b/i, label: 'Greged' },
+  { pattern: /\bpangenan\b/i, label: 'Pangenan' },
+];
+
+const KOTA_CIREBON_KEYWORDS: { pattern: RegExp; label: string }[] = [
+  { pattern: /\bkota\s*cirebon\b/i, label: 'Kota Cirebon' },
+  { pattern: /\bkesambi\b/i, label: 'Kesambi' },
+  { pattern: /\bsunyaragi\b/i, label: 'Kesambi' },
+  { pattern: /\bdrajat\b/i, label: 'Kesambi' },
+  { pattern: /\bkaryamulya\b/i, label: 'Kesambi' },
+  { pattern: /\bpekiringan\b/i, label: 'Kesambi' },
+  { pattern: /\bkejaksan\b/i, label: 'Kejaksan' },
+  { pattern: /\bsiliwangi\b/i, label: 'Kejaksan' },
+  { pattern: /\bkartini\b/i, label: 'Kejaksan' },
+  { pattern: /\bsukapura\b/i, label: 'Kejaksan' },
+  { pattern: /\bkebon\s*baru\b/i, label: 'Kejaksan' },
+  { pattern: /\bkesenden\b/i, label: 'Kejaksan' },
+  { pattern: /\bpekalipan\b/i, label: 'Pekalipan' },
+  { pattern: /\bpekalangan\b/i, label: 'Pekalipan' },
+  { pattern: /\bpulasaren\b/i, label: 'Pekalipan' },
+  { pattern: /\bjagasatru\b/i, label: 'Pekalipan' },
+  { pattern: /\bsukalila\b/i, label: 'Pekalipan' },
+  { pattern: /\bkaranggetas\b/i, label: 'Pekalipan' },
+  { pattern: /\blemahwungkuk\b/i, label: 'Lemahwungkuk' },
+  { pattern: /\bkasepuhan\b/i, label: 'Lemahwungkuk' },
+  { pattern: /\bpegambiran\b/i, label: 'Lemahwungkuk' },
+  { pattern: /\bpanjunan\b/i, label: 'Lemahwungkuk' },
+  { pattern: /\bharjamukti\b/i, label: 'Harjamukti' },
+  { pattern: /\bkalijaga\b/i, label: 'Harjamukti' },
+  { pattern: /\blarangan\b/i, label: 'Harjamukti' },
+  { pattern: /\bargasunya\b/i, label: 'Harjamukti' },
+  { pattern: /\bkecapi\b/i, label: 'Harjamukti' },
+  { pattern: /\bperumnas\b/i, label: 'Harjamukti' },
+  { pattern: /\bcipto\b/i, label: 'Kesambi / Cipto' },
+  { pattern: /\bsudarsono\b/i, label: 'Kesambi' },
+  { pattern: /\bkanggraksan\b/i, label: 'Harjamukti' },
+  { pattern: /\bkalitanjung\b/i, label: 'Harjamukti' },
+];
+
+/**
+ * Deteksi otomatis apakah alamat / link Google Maps / koordinat berada di
+ * Kota Cirebon (GRATIS ONGKIR Rp 0) atau Kabupaten Cirebon (ONGKIR Rp 15.000).
+ */
+export function detectCirebonDeliveryInfo(
+  addressText: string,
+  mapsText: string = '',
+  coords?: { lat?: number; lng?: number }
+): DetectedCirebonDelivery {
+  const combinedText = `${addressText || ''} ${mapsText || ''}`.trim();
+
+  // 1. Prioritaskan koordinat GPS/Maps jika tersedia
+  if (coords?.lat !== undefined && coords?.lng !== undefined && !isNaN(coords.lat) && !isNaN(coords.lng)) {
+    const closest = findClosestCirebonArea(coords.lat, coords.lng);
+    const distKm = calculateDistanceToWorkshop(coords.lat, coords.lng);
+    if (closest.type === 'Kabupaten' || distKm > 6.5) {
+      return {
+        areaType: 'Kabupaten',
+        areaName: closest.type === 'Kabupaten' ? closest.name : 'Kabupaten Cirebon',
+        deliveryFee: 15000,
+        distanceZone: 'jauh_kabupaten',
+        matchedBy: 'coords',
+        matchedLabel: `${closest.name.split('(')[0].trim()} (${distKm} km)`,
+      };
+    }
+    return {
+      areaType: 'Kota',
+      areaName: closest.name,
+      deliveryFee: 0,
+      distanceZone: 'dekat_kota',
+      matchedBy: 'coords',
+      matchedLabel: `${closest.name.split('(')[0].trim()} (${distKm} km)`,
+    };
+  }
+
+  // 2. Cek kecocokan kata kunci Kabupaten Cirebon di alamat / link Maps
+  for (const item of KABUPATEN_CIREBON_KEYWORDS) {
+    if (item.pattern.test(combinedText)) {
+      return {
+        areaType: 'Kabupaten',
+        areaName: item.label,
+        deliveryFee: 15000,
+        distanceZone: 'jauh_kabupaten',
+        matchedBy: 'address',
+        matchedLabel: item.label,
+      };
+    }
+  }
+
+  // 3. Cek kecocokan kata kunci Kota Cirebon
+  for (const item of KOTA_CIREBON_KEYWORDS) {
+    if (item.pattern.test(combinedText)) {
+      return {
+        areaType: 'Kota',
+        areaName: item.label,
+        deliveryFee: 0,
+        distanceZone: 'dekat_kota',
+        matchedBy: 'address',
+        matchedLabel: item.label,
+      };
+    }
+  }
+
+  // 4. Default aman Kota Cirebon
+  return {
+    areaType: 'Kota',
+    areaName: 'Kota Cirebon',
+    deliveryFee: 0,
+    distanceZone: 'dekat_kota',
+    matchedBy: 'default',
+    matchedLabel: '',
+  };
+}
+
 export interface DistanceZoneOption {
   id: 'dekat_kota' | 'jauh_kabupaten' | 'luar_cirebon';
   title: string;
