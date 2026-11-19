@@ -17,7 +17,31 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
-        }
+        },
+        dedupe: [
+          'firebase',
+          '@firebase/app',
+          '@firebase/app-types',
+          '@firebase/component',
+          '@firebase/firestore',
+          '@firebase/auth',
+          '@firebase/analytics',
+          '@firebase/util',
+        ],
+      },
+      optimizeDeps: {
+        include: [
+          'react',
+          'react-dom',
+          'react-dom/client',
+          'lucide-react',
+          'framer-motion',
+          'qrcode',
+          'firebase/app',
+          'firebase/auth',
+          'firebase/firestore',
+          'firebase/analytics',
+        ],
       },
       build: {
         outDir: 'dist',

@@ -325,7 +325,7 @@ export const App: React.FC = () => {
   }, [orders, myOrderIds, customerUser, adminUser, courierUser]);
 
   // Handle adding new order & simpan langsung ke koleksi 'oderan' di Firebase Firestore (default)
-  const handleOrderCreated = (newOrder: Order) => {
+  const handleOrderCreated = (newOrder: Order): Promise<boolean> => {
     const orderWithCustomer = customerUser && !newOrder.customerId
       ? { ...newOrder, customerId: customerUser.id }
       : newOrder;
@@ -355,7 +355,7 @@ export const App: React.FC = () => {
       }
       return [orderWithCustomer, ...prev];
     });
-    void saveOrderToFirestore(orderWithCustomer, true, setFirebaseError);
+    return saveOrderToFirestore(orderWithCustomer, true, setFirebaseError);
   };
 
   // Handle accepting order by Admin or Courier Soleman & sync immediately to Firebase Firestore (default)

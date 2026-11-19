@@ -274,6 +274,10 @@ Mohon diagnosis dan berikan rekomendasi menu servis resmi Soleman dalam format J
     });
   } else {
     try {
+      app.get('/sw.js', (_req: Request, res: Response, next) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        next();
+      });
       const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({
         server: {

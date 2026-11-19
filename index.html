@@ -132,15 +132,43 @@
     }
     </script>
 
-    <!-- Register PWA Service Worker -->
+    <!-- Register PWA Service Worker (Non-dev) & Clean Stale Dev Caches Immediately -->
     <script>
-      if ('serviceWorker' in navigator) {
+      (function() {
+        if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+        var isDevPreview =
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1' ||
+          window.location.hostname.indexOf('ais-dev-') !== -1;
+
+        if (isDevPreview) {
+          var hadController = Boolean(navigator.serviceWorker.controller);
+          Promise.all([
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              return Promise.all(regs.map(function(reg) { return reg.unregister(); }));
+            }).catch(function() {}),
+            'caches' in window
+              ? caches.keys().then(function(keys) {
+                  return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+                }).catch(function() {})
+              : Promise.resolve(),
+          ]).then(function() {
+            try {
+              if (hadController && !sessionStorage.getItem('soleman_sw_purged_v4')) {
+                sessionStorage.setItem('soleman_sw_purged_v4', '1');
+                window.location.reload();
+              }
+            } catch (e) {}
+          });
+          return;
+        }
+
         window.addEventListener('load', function() {
           navigator.serviceWorker.register('/sw.js').catch(function(err) {
             console.log('SW registration error:', err);
           });
         });
-      }
+      })();
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>

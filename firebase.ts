@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { getAuth } from 'firebase/auth';
 import {
@@ -25,8 +25,8 @@ export const firebaseConfig = {
   firestoreDatabaseId: FIRESTORE_DATABASE_ID,
 };
 
-// Initialize Firebase App
-export const app = initializeApp(firebaseConfig);
+// Initialize Firebase App safely (single instance across HMR/reloads)
+export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 // Initialize Analytics hanya jika measurementId valid dan tidak kosong (mencegah NetworkError)
 export const analyticsPromise =
@@ -123,7 +123,7 @@ export async function testFirestoreConnection(): Promise<{
   errorMessage?: string;
 }> {
   try {
-    await getDocFromServer(doc(db, 'oderan', 'connection-test'));
+    await getDocFromServer(doc(db, 'test', 'connection'));
     return { ok: true };
   } catch (error) {
     const rawMsg = error instanceof Error ? error.message : String(error);
@@ -132,4 +132,8 @@ export async function testFirestoreConnection(): Promise<{
     }
     return { ok: false, errorMessage: rawMsg };
   }
+}
+
+if (typeof window !== 'undefined') {
+  void testFirestoreConnection();
 }

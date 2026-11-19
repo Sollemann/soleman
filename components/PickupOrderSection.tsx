@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Truck, 
   MapPin, 
@@ -20,7 +20,8 @@ import {
   Sparkles, 
   QrCode, 
   Bell,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 import { 
   SERVICES_CATALOG, 
@@ -81,7 +82,7 @@ interface PickupOrderSectionProps {
   myActiveOrders?: Order[];
   browserNotifPermission?: string;
   onRequestBrowserNotif?: () => void;
-  onOrderCreated: (order: Order) => void;
+  onOrderCreated: (order: Order) => Promise<boolean> | void;
   onOpenDashboard: () => void;
   onOpenTrackerWithId?: (orderId: string) => void;
 }
@@ -176,9 +177,22 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   // Payment Method
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
 
-  // UI state
+  // UI state & anti-spam lock
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [validationError, setValidationError] = useState('');
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [submittingMode, setSubmittingMode] = useState<'courier' | 'whatsapp' | null>(null);
+  const [submitCooldown, setSubmitCooldown] = useState<number>(0);
+  const submittingLockRef = useRef<boolean>(false);
+  const statusCardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (submitCooldown <= 0) return;
+    const timer = window.setTimeout(() => {
+      setSubmitCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [submitCooldown]);
 
   // Synchronize shoesList when pairsCount changes
   useEffect(() => {
@@ -364,8 +378,12 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
   const deliveryFee = pickupType === 'drop_off' ? 0 : 0;
   const grandTotal = totalServicesPrice + deliveryFee;
 
-  // Handle Order Submit: simpan pesanan & alamat lengkap ke Portal Kurir Soleman
-  const handleCreateOrder = (sendToWhatsApp: boolean = false) => {
+  // Handle Order Submit: simpan pesanan & alamat lengkap ke Portal Kurir Soleman (dengan kunci anti-spam)
+  const handleCreateOrder = async (sendToWhatsApp: boolean = false) => {
+    if (submittingLockRef.current || isSubmittingOrder || submitCooldown > 0) {
+      return;
+    }
+
     setValidationError('');
 
     if (!customerName.trim()) {
@@ -409,91 +427,116 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
       return;
     }
 
-    const parsedMaps = mapsLinkInput.trim() ? parseShareLocInput(mapsLinkInput) : {};
+    // Kunci segera agar klik ganda / tap berulang tidak menghasilkan pesanan duplikat
+    submittingLockRef.current = true;
+    setIsSubmittingOrder(true);
+    setSubmittingMode(sendToWhatsApp ? 'whatsapp' : 'courier');
+    soundFx.playClick();
 
-    const allPhotos = shoeDetailsWithPrices
-      .map(s => s.photoUrl)
-      .filter((url): url is string => Boolean(url));
+    try {
+      const parsedMaps = mapsLinkInput.trim() ? parseShareLocInput(mapsLinkInput) : {};
 
-    const allServicesFlattened = Array.from(
-      new Set(shoeDetailsWithPrices.flatMap(s => s.selectedServices))
-    );
+      const allPhotos = shoeDetailsWithPrices
+        .map(s => s.photoUrl)
+        .filter((url): url is string => Boolean(url));
 
-    const summaryBrand = pairsCount === 1 
-      ? shoesList[0].shoeBrand 
-      : `${shoesList[0].shoeBrand} (+${pairsCount - 1} pasang)`;
+      const allServicesFlattened = Array.from(
+        new Set(shoeDetailsWithPrices.flatMap(s => s.selectedServices))
+      );
 
-    const cleanArea = areaName.trim() || 'Cirebon';
-    const cleanAddressNote = customerAddress.trim();
+      const summaryBrand = pairsCount === 1 
+        ? shoesList[0].shoeBrand 
+        : `${shoesList[0].shoeBrand} (+${pairsCount - 1} pasang)`;
 
-    const newOrder: Order = {
-      id: `SLC-${Math.floor(1000 + Math.random() * 9000)}`,
-      customerId: customerUser?.id,
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      shoeBrand: summaryBrand,
-      shoeType: shoesList[0].shoeType,
-      shoeSize: shoeDetailsWithPrices[0]?.shoeSize,
-      material: shoesList[0].material,
-      severity: shoesList[0].severity,
-      pairsCount,
-      selectedServices: allServicesFlattened,
-      shoes: shoeDetailsWithPrices,
-      customNotes: shoesList.map(s => s.customNotes).filter(Boolean).join(' | ') || undefined,
-      photoUrl: allPhotos[0],
-      photos: allPhotos,
-      pickupType,
-      preferredTimeSlot: 'siang',
-      distanceZone: 'dekat_kota',
-      logisticsPartner: 'kurir_soleman',
-      customerConfirmedMaterialPhoto: true,
-      location: {
-        areaName: cleanArea,
-        areaType: 'Kota',
+      const cleanArea = areaName.trim() || 'Cirebon';
+      const cleanAddressNote = customerAddress.trim();
+
+      const newOrder: Order = {
+        id: `SLC-${Math.floor(1000 + Math.random() * 9000)}`,
+        customerId: customerUser?.id,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        shoeBrand: summaryBrand,
+        shoeType: shoesList[0].shoeType,
+        shoeSize: shoeDetailsWithPrices[0]?.shoeSize,
+        material: shoesList[0].material,
+        severity: shoesList[0].severity,
+        pairsCount,
+        selectedServices: allServicesFlattened,
+        shoes: shoeDetailsWithPrices,
+        customNotes: shoesList.map(s => s.customNotes).filter(Boolean).join(' | ') || undefined,
+        photoUrl: allPhotos[0],
+        photos: allPhotos,
+        pickupType,
+        preferredTimeSlot: 'siang',
         distanceZone: 'dekat_kota',
         logisticsPartner: 'kurir_soleman',
-        shareLocViaWhatsApp: false,
-        isLiveShared: Boolean(parsedMaps.lat || parsedMaps.cleanUrl),
-        lat: parsedMaps.lat,
-        lng: parsedMaps.lng,
-        mapsUrl: parsedMaps.cleanUrl,
-        fullAddress: cleanAddressNote || 'Lihat titik Google Maps pesanan',
-        landmark: cleanAddressNote || 'Alamat penjemputan Kurir Soleman',
-      },
-      paymentMethod,
-      paymentStatus: paymentMethod === 'cod' ? 'cod_pending' : 'menunggu_pembayaran',
-      totalServicesPrice,
-      deliveryFee,
-      totalAmount: grandTotal,
-      status: 'menunggu_jemput',
-      isAcceptedByAdmin: false,
-      createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
-      estimatedFinishedAt: '1 - 3 Hari Kerja',
-      technicianName: 'Master Teknisi Soleman',
-      assignedCourier: 'Kurir Soleman',
-      assignedCourierPhone: '083152276387',
-      timeline: [
-        {
-          status: 'menunggu_jemput',
-          label: 'Pesanan Diterima di Sistem',
-          timestamp: 'Baru saja',
-          description: `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()}. Alamat: ${cleanAddressNote || parsedMaps.cleanUrl}.`
+        customerConfirmedMaterialPhoto: true,
+        location: {
+          areaName: cleanArea,
+          areaType: 'Kota',
+          distanceZone: 'dekat_kota',
+          logisticsPartner: 'kurir_soleman',
+          shareLocViaWhatsApp: false,
+          isLiveShared: Boolean(parsedMaps.lat || parsedMaps.cleanUrl),
+          lat: parsedMaps.lat,
+          lng: parsedMaps.lng,
+          mapsUrl: parsedMaps.cleanUrl,
+          fullAddress: cleanAddressNote || 'Lihat titik Google Maps pesanan',
+          landmark: cleanAddressNote || 'Alamat penjemputan Kurir Soleman',
+        },
+        paymentMethod,
+        paymentStatus: paymentMethod === 'cod' ? 'cod_pending' : 'menunggu_pembayaran',
+        totalServicesPrice,
+        deliveryFee,
+        totalAmount: grandTotal,
+        status: 'menunggu_jemput',
+        isAcceptedByAdmin: false,
+        createdAt: new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }),
+        estimatedFinishedAt: '1 - 3 Hari Kerja',
+        technicianName: 'Master Teknisi Soleman',
+        assignedCourier: 'Kurir Soleman',
+        assignedCourierPhone: '083152276387',
+        timeline: [
+          {
+            status: 'menunggu_jemput',
+            label: 'Pesanan Diterima di Sistem',
+            timestamp: 'Baru saja',
+            description: `Booking ${pairsCount} pasang sepatu atas nama ${customerName.trim()}. Alamat: ${cleanAddressNote || parsedMaps.cleanUrl}.`
+          }
+        ]
+      };
+
+      const minDelay = new Promise<void>((resolve) => window.setTimeout(resolve, 900));
+      const savePromise = Promise.resolve(onOrderCreated(newOrder));
+      const timeoutPromise = new Promise<void>((resolve) => window.setTimeout(resolve, 6000));
+
+      await Promise.all([
+        minDelay,
+        Promise.race([savePromise.then(() => undefined), timeoutPromise]),
+      ]);
+
+      setCreatedOrder(newOrder);
+      setSubmitCooldown(6);
+      soundFx.playSuccess();
+
+      window.setTimeout(() => {
+        statusCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 120);
+
+      if (sendToWhatsApp) {
+        const waUrl = buildNewOrderWhatsAppUrl(newOrder);
+        const opened = window.open(waUrl, '_blank', 'noopener,noreferrer');
+        if (!opened) {
+          try {
+            window.location.assign(waUrl);
+          } catch {}
         }
-      ]
-    };
-
-    setCreatedOrder(newOrder);
-    onOrderCreated(newOrder);
-    soundFx.playSuccess();
-
-    if (sendToWhatsApp) {
-      const waUrl = buildNewOrderWhatsAppUrl(newOrder);
-      const opened = window.open(waUrl, '_blank', 'noopener,noreferrer');
-      if (!opened) {
-        try {
-          window.location.assign(waUrl);
-        } catch {}
       }
+    } finally {
+      submittingLockRef.current = false;
+      setIsSubmittingOrder(false);
+      setSubmittingMode(null);
     }
   };
 
@@ -528,7 +571,7 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
         if (ordersToShow.length === 0) return null;
 
         return (
-          <div className="mb-8 space-y-4">
+          <div ref={statusCardRef} className="mb-8 space-y-4">
             {ordersToShow.map((ord, idx) => {
               const stInfo = STATUS_LABELS[ord.status] || STATUS_LABELS.menunggu_jemput;
               const isCancelled = ord.status === 'dibatalkan';
@@ -646,7 +689,10 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => setCreatedOrder(null)}
+                          onClick={() => {
+                            setCreatedOrder(null);
+                            setSubmitCooldown(0);
+                          }}
                           className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-700 transition-all cursor-pointer"
                         >
                           <span>Tutup / Pesan Lagi</span>
@@ -1112,23 +1158,72 @@ export const PickupOrderSection: React.FC<PickupOrderSectionProps> = ({
             </div>
           )}
 
+          {(isSubmittingOrder || submitCooldown > 0) && (
+            <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-400/40 text-amber-200 text-xs font-semibold flex items-center gap-2">
+              <Loader2 className={`w-4 h-4 text-amber-300 shrink-0 ${isSubmittingOrder ? 'animate-spin' : ''}`} />
+              <span>
+                {isSubmittingOrder
+                  ? 'Pesanan lagi diproses & dikirim ke Kurir Soleman... Mohon tunggu sebentar, jangan tekan ulang.'
+                  : `Pesanan #${createdOrder?.id || ''} lagi diproses di sistem Kurir. Tombol dikunci ${submitCooldown} detik agar tidak spam pesanan ganda.`}
+              </span>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="button"
+              disabled={isSubmittingOrder || submitCooldown > 0}
               onClick={() => handleCreateOrder(false)}
-              className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer"
+              className={`flex-1 py-3.5 px-6 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all ${
+                isSubmittingOrder || submitCooldown > 0
+                  ? 'bg-amber-400/90 text-slate-950 cursor-not-allowed opacity-90 shadow-lg shadow-amber-500/20'
+                  : 'bg-gradient-to-r from-cyan-400 to-sky-400 hover:from-cyan-300 hover:to-sky-300 text-slate-950 shadow-lg shadow-cyan-500/25 cursor-pointer'
+              }`}
             >
-              <Truck className="w-4 h-4 stroke-[2.5]" />
-              <span>Pesan Sekarang (Kirim ke Kurir)</span>
+              {isSubmittingOrder ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin stroke-[2.5]" />
+                  <span>{submittingMode === 'whatsapp' ? 'Lagi Diproses ke WA...' : 'Lagi Diproses...'}</span>
+                </>
+              ) : submitCooldown > 0 ? (
+                <>
+                  <Clock className="w-4 h-4 stroke-[2.5]" />
+                  <span>Lagi Diproses ({submitCooldown}d)</span>
+                </>
+              ) : (
+                <>
+                  <Truck className="w-4 h-4 stroke-[2.5]" />
+                  <span>Pesan Sekarang (Kirim ke Kurir)</span>
+                </>
+              )}
             </button>
 
             <button
               type="button"
+              disabled={isSubmittingOrder || submitCooldown > 0}
               onClick={() => handleCreateOrder(true)}
-              className="py-3.5 px-6 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 font-bold text-sm flex items-center justify-center gap-2 border border-emerald-400/40 transition-all cursor-pointer"
+              className={`py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border transition-all ${
+                isSubmittingOrder || submitCooldown > 0
+                  ? 'bg-slate-800/80 text-slate-400 border-slate-700 cursor-not-allowed opacity-75'
+                  : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-400/40 cursor-pointer'
+              }`}
             >
-              <MessageSquare className="w-4 h-4 text-emerald-400" />
-              <span>Pesan & Salinan ke WA</span>
+              {isSubmittingOrder && submittingMode === 'whatsapp' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                  <span>Lagi Diproses...</span>
+                </>
+              ) : submitCooldown > 0 ? (
+                <>
+                  <Clock className="w-4 h-4 text-slate-400" />
+                  <span>Lagi Diproses ({submitCooldown}d)</span>
+                </>
+              ) : (
+                <>
+                  <MessageSquare className="w-4 h-4 text-emerald-400" />
+                  <span>Pesan & Salinan ke WA</span>
+                </>
+              )}
             </button>
           </div>
         </div>
